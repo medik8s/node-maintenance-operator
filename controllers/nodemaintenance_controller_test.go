@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	nodemaintenanceapi "medik8s.io/node-maintenance-operator/api/v1beta1"
+	nodemaintenanceapi "github.com/medik8s/node-maintenance-operator/api/v1beta1"
 )
 
 var _ = Describe("NodeMaintenance", func() {

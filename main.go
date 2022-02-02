@@ -33,9 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	nodemaintenancev1beta1 "medik8s.io/node-maintenance-operator/api/v1beta1"
-	"medik8s.io/node-maintenance-operator/controllers"
-	"medik8s.io/node-maintenance-operator/version"
+	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/api/v1beta1"
+	"github.com/medik8s/node-maintenance-operator/controllers"
+	"github.com/medik8s/node-maintenance-operator/version"
 	//+kubebuilder:scaffold:imports
 )
 

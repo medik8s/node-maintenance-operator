@@ -21,8 +21,8 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nmo "medik8s.io/node-maintenance-operator/api/v1beta1"
-	nodemaintenance "medik8s.io/node-maintenance-operator/controllers"
+	nmo "github.com/medik8s/node-maintenance-operator/api/v1beta1"
+	nodemaintenance "github.com/medik8s/node-maintenance-operator/controllers"
 )
 
 var (

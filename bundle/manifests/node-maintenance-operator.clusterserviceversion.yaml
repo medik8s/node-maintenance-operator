@@ -275,7 +275,6 @@ spec:
     type: AllNamespaces
   keywords:
   - medik8s
-  - Virtualization
   - Node-maintenance
   links:
   - name: medik8s
@@ -283,11 +282,12 @@ spec:
   - name: Source Code
     url: https://github.com/medik8s/node-maintenance-operator
   maintainers:
-  - email: kni-lifecycle-team@redhat.com
-    name: Dragonfly Team
+  - email: medik8s@googlegroups.com
+    name: Medik8s Team
   maturity: beta
   provider:
-    name: Red Hat
+    name: medik8s
+    url: https://github.com/medik8s
   version: 0.0.1
   webhookdefinitions:
   - admissionReviewVersions:
