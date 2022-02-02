@@ -1,0 +1,26 @@
+name: Pre Submit
+on:
+  push:
+    branches:
+      - master
+      - main
+      - release-*
+  pull_request:
+    branches:
+      - master
+      - main
+      - release-*
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Checks and unit tests
+      run: make check
+
+    - name: Build images
+      run: make container-build

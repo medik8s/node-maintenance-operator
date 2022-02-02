@@ -1,0 +1,34 @@
+name: Publish Container Images
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - 'v*'
+
+jobs:
+  push_to_registry:
+    name: Build and push images to quay.io/medik8s
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Log in to Quay.io
+        uses: redhat-actions/podman-login@v1
+        with:
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+          registry: quay.io
+
+      - name: Build and push CSV 0.0.1 + latest images for PR merges to master/main
+        if: ${{ github.ref_type != 'tag' }}
+        run: make container-build container-push bundle bundle-build bundle-push catalog-build catalog-push must-gather-build must-gather-push
+
+      - name: Build and push versioned CSV and images for tags
+        if: ${{ github.ref_type == 'tag' }}
+        # remove leading 'v' from tag!
+        run: export VERSION=$(echo $GITHUB_REF_NAME | sed 's/v//') && make container-build container-push bundle bundle-build bundle-push catalog-build catalog-push must-gather-build must-gather-push
