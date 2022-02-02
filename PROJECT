@@ -5,7 +5,7 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: node-maintenance-operator
-repo: medik8s.io/node-maintenance-operator
+repo: github.com/medik8s/node-maintenance-operator
 resources:
 - api:
     crdVersion: v1
@@ -14,7 +14,7 @@ resources:
   domain: medik8s.io
   group: nodemaintenance
   kind: NodeMaintenance
-  path: medik8s.io/node-maintenance-operator/api/v1beta1
+  path: github.com/medik8s/node-maintenance-operator
   version: v1beta1
   webhooks:
     validation: true

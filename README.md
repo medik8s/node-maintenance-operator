@@ -129,7 +129,6 @@ The phase is updated for each processing attempt on the CR.
 For new minor releases:
 
   - create and push the `release-0.y` branch.
-  - update medik8sCI and OpenshiftCI with new branches!
 
 For every major / minor / patch release:
 
