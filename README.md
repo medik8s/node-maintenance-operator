@@ -1,3 +1,5 @@
+TEST
+
 # Node Maintenance Operator
 
 The node-maintenance-operator is an operator generated from the [operator-sdk](https://github.com/operator-framework/operator-sdk).
