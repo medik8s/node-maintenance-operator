@@ -26,9 +26,9 @@ jobs:
 
       - name: Build and push CSV 0.0.1 + latest images for PR merges to master/main
         if: ${{ github.ref_type != 'tag' }}
-        run: make container-build container-push bundle bundle-build bundle-push catalog-build catalog-push must-gather-build must-gather-push
+        run: export IMAGE_REGISTRY=quay.io/medik8s && make container-build container-push bundle bundle-build bundle-push catalog-build catalog-push must-gather-build must-gather-push
 
       - name: Build and push versioned CSV and images for tags
         if: ${{ github.ref_type == 'tag' }}
         # remove leading 'v' from tag!
-        run: export VERSION=$(echo $GITHUB_REF_NAME | sed 's/v//') && make container-build container-push bundle bundle-build bundle-push catalog-build catalog-push must-gather-build must-gather-push
+        run: export IMAGE_REGISTRY=quay.io/medik8s && export VERSION=$(echo $GITHUB_REF_NAME | sed 's/v//') && make container-build container-push bundle bundle-build bundle-push catalog-build catalog-push must-gather-build must-gather-push
