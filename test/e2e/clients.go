@@ -8,7 +8,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	//operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	nmoapi "kubevirt.io/node-maintenance-operator/api/v1beta1"
+	nmoapi "github.com/medik8s/node-maintenance-operator/api/v1beta1"
 )
 
 var (

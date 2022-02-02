@@ -6,7 +6,7 @@ The purpose of this operator is to watch for new or deleted custom resources cal
   - NodeMaintenance CR deleted: remove pod from maintenance and uncordon the node - set it as schedulable.
 
 > *Note*:  The current behavior of the operator is to mimic `kubectl drain <node name>`
-> as performed in [Kubevirt - evict all VMs and Pods on a node ](https://kubevirt.io/user-guide/docs/latest/administration/node-eviction.html#how-to-evict-all-vms-and-pods-on-a-node)
+> as performed in [medik8s - evict all VMs and Pods on a node ](https://medik8s.io/user-guide/docs/latest/administration/node-eviction.html#how-to-evict-all-vms-and-pods-on-a-node)
 
 ## Build and run the operator
 
@@ -24,7 +24,7 @@ For deployment of NMO using these images you need:
 - `operator-sdk` binary installed, see https://sdk.operatorframework.io/docs/installation/
 - a valid `$KUBECONFIG` configured to access your cluster.
 
-Then run `operator-sdk run bundle quay.io/kubevirt/node-maintenance-operator-bundle:latest`
+Then run `operator-sdk run bundle quay.io/medik8s/node-maintenance-operator-bundle:latest`
 
 ### Build and deploy from sources
 Follow the instructions [here](https://sdk.operatorframework.io/docs/building-operators/golang/tutorial/#3-deploy-your-operator-with-olm) for deploying the operator with OLM.
@@ -43,7 +43,7 @@ Create the example `NodeMaintenance` CR found at `config/samples/nodemaintenance
 
 ```sh
 $ cat config/samples/nodemaintenance_v1beta1_nodemaintenance.yaml
-apiVersion: nodemaintenance.kubevirt.io/v1beta1
+apiVersion: nodemaintenance.medik8s.io/v1beta1
 kind: NodeMaintenance
 metadata:
   name: nodemaintenance-sample
@@ -56,7 +56,7 @@ $ kubectl apply -f config/samples/nodemaintenance_v1beta1_nodemaintenance.yaml
 $ kubectl logs <nmo-pod-name>
 {"level":"info","ts":1551794418.6742408,"logger":"controller_nodemaintenance","msg":"Reconciling NodeMaintenance","Request.Namespace":"default","Request.Name":"node02"}
 {"level":"info","ts":1551794418.674294,"logger":"controller_nodemaintenance","msg":"Applying Maintenance mode on Node: node02 with Reason: Test node maintenance","Request.Namespace":"default","Request.Name":"node02"}
-{"level":"info","ts":1551783365.7430992,"logger":"controller_nodemaintenance","msg":"WARNING: ignoring DaemonSet-managed Pods: default/local-volume-provisioner-5xft8, kubevirt/disks-images-provider-bxpc5, kubevirt/virt-handler-52kpr, openshift-monitoring/node-exporter-4c9jt, openshift-node/sync-8w5x8, openshift-sdn/ovs-kvz9w, openshift-sdn/sdn-qnjdz\n"}
+{"level":"info","ts":1551783365.7430992,"logger":"controller_nodemaintenance","msg":"WARNING: ignoring DaemonSet-managed Pods: default/local-volume-provisioner-5xft8, medik8s/disks-images-provider-bxpc5, medik8s/virt-handler-52kpr, openshift-monitoring/node-exporter-4c9jt, openshift-node/sync-8w5x8, openshift-sdn/ovs-kvz9w, openshift-sdn/sdn-qnjdz\n"}
 {"level":"info","ts":1551783365.7471824,"logger":"controller_nodemaintenance","msg":"evicting pod \"virt-operator-5559b7d86f-2wsnz\"\n"}
 {"level":"info","ts":1551783365.7472217,"logger":"controller_nodemaintenance","msg":"evicting pod \"cdi-operator-55b47b74b5-9v25c\"\n"}
 {"level":"info","ts":1551783365.747241,"logger":"controller_nodemaintenance","msg":"evicting pod \"virt-api-7fcd86776d-652tv\"\n"}
@@ -84,7 +84,7 @@ $ kubectl logs <nmo-pod-name>
 The NodeMaintenance CR can contain the following status fields:
 
 ```yaml
-apiVersion: nodemaintenance.kubevirt.io/v1beta1
+apiVersion: nodemaintenance.medik8s.io/v1beta1
 kind: NodeMaintenance
 metadata:
   name: nodemaintenance-xyz
@@ -129,7 +129,6 @@ The phase is updated for each processing attempt on the CR.
 For new minor releases:
 
   - create and push the `release-0.y` branch.
-  - update KubeVirtCI and OpenshiftCI with new branches!
 
 For every major / minor / patch release:
 

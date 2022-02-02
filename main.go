@@ -33,9 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	nodemaintenancev1beta1 "kubevirt.io/node-maintenance-operator/api/v1beta1"
-	"kubevirt.io/node-maintenance-operator/controllers"
-	"kubevirt.io/node-maintenance-operator/version"
+	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/api/v1beta1"
+	"github.com/medik8s/node-maintenance-operator/controllers"
+	"github.com/medik8s/node-maintenance-operator/version"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -76,7 +76,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "135b1886.kubevirt.io",
+		LeaderElectionID:       "135b1886.medik8s.io",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

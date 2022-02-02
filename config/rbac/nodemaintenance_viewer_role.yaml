@@ -5,7 +5,7 @@ metadata:
   name: nodemaintenance-viewer-role
 rules:
 - apiGroups:
-  - nodemaintenance.kubevirt.io
+  - nodemaintenance.medik8s.io
   resources:
   - nodemaintenances
   verbs:
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - nodemaintenance.kubevirt.io
+  - nodemaintenance.medik8s.io
   resources:
   - nodemaintenances/status
   verbs:

@@ -9,5 +9,5 @@ To collect this data, you must specify the extra image using the `--image` optio
 Example:
 
 ```bash
-oc adm must-gather --image=quay.io/kubevirt/lifecycle-must-gather:latest
+oc adm must-gather --image=quay.io/medik8s/node-maintenance-must-gather:latest
 ```

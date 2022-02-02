@@ -13,12 +13,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-nodemaintenance-kubevirt-io-v1beta1-nodemaintenance
+      path: /validate-nodemaintenance-medik8s-io-v1beta1-nodemaintenance
   failurePolicy: Fail
   name: vnodemaintenance.kb.io
   rules:
   - apiGroups:
-    - nodemaintenance.kubevirt.io
+    - nodemaintenance.medik8s.io
     apiVersions:
     - v1beta1
     operations:

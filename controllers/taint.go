@@ -13,8 +13,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var KubevirtDrainTaint = &corev1.Taint{
-	Key:    "kubevirt.io/drain",
+var medik8sDrainTaint = &corev1.Taint{
+	Key:    "medik8s.io/drain",
 	Effect: corev1.TaintEffectNoSchedule,
 }
 
@@ -22,7 +22,7 @@ var NodeUnschedulableTaint = &corev1.Taint{
 	Key:    "node.kubernetes.io/unschedulable",
 	Effect: corev1.TaintEffectNoSchedule,
 }
-var MaintenanceTaints = []corev1.Taint{*NodeUnschedulableTaint, *KubevirtDrainTaint}
+var MaintenanceTaints = []corev1.Taint{*NodeUnschedulableTaint, *medik8sDrainTaint}
 
 func AddOrRemoveTaint(clientset kubernetes.Interface, node *corev1.Node, add bool) error {
 
@@ -61,7 +61,7 @@ func AddOrRemoveTaint(clientset kubernetes.Interface, node *corev1.Node, add boo
 		return err
 	}
 
-	log.Infof("Applying %s taint %s on Node: %s", KubevirtDrainTaint.Key, taintStr, node.Name)
+	log.Infof("Applying %s taint %s on Node: %s", medik8sDrainTaint.Key, taintStr, node.Name)
 
 	test := fmt.Sprintf(`{ "op": "test", "path": "/spec/taints", "value": %s }`, string(oldTaints))
 	log.Infof("Patching taints on Node: %s", node.Name)

@@ -22,9 +22,6 @@ COPY vendor/ vendor/
 # for getting version info
 COPY .git/ .git/
 
-# for HCO
-COPY bundle/ bundle/
-
 
 # Build
 RUN ./hack/build.sh
@@ -35,9 +32,5 @@ WORKDIR /
 COPY --from=builder /workspace/bin/manager .
 USER 65532:65532
 
-# needed for HCO
-LABEL org.kubevirt.hco.csv-generator.v1="/usr/local/bin/csv-generator"
-COPY --from=builder /workspace/hack/csv-generator.sh /usr/local/bin/csv-generator
-COPY --from=builder /workspace/bundle/manifests /manifests
 
 ENTRYPOINT ["/manager"]
