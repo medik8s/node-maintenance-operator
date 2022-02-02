@@ -66,7 +66,7 @@ rules:
   - create
   - get
 - apiGroups:
-  - nodemaintenance.kubevirt.io
+  - nodemaintenance.medik8s.io
   resources:
   - nodemaintenances
   verbs:
@@ -78,13 +78,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - nodemaintenance.kubevirt.io
+  - nodemaintenance.medik8s.io
   resources:
   - nodemaintenances/finalizers
   verbs:
   - update
 - apiGroups:
-  - nodemaintenance.kubevirt.io
+  - nodemaintenance.medik8s.io
   resources:
   - nodemaintenances/status
   verbs:

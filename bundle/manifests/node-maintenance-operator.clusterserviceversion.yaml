@@ -5,7 +5,7 @@ metadata:
     alm-examples: |-
       [
         {
-          "apiVersion": "nodemaintenance.kubevirt.io/v1beta1",
+          "apiVersion": "nodemaintenance.medik8s.io/v1beta1",
           "kind": "NodeMaintenance",
           "metadata": {
             "name": "nodemaintenance-sample"
@@ -22,7 +22,7 @@ metadata:
     operators.openshift.io/infrastructure-features: '["disconnected"]'
     operators.operatorframework.io/builder: operator-sdk-v1.11.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-    repository: https://github.com/kubevirt/node-maintenance-operator
+    repository: https://github.com/medik8s/node-maintenance-operator
   name: node-maintenance-operator.v0.0.1
   namespace: placeholder
 spec:
@@ -32,7 +32,7 @@ spec:
     - description: NodeMaintenance is the Schema for the nodemaintenances API
       displayName: Node Maintenance
       kind: NodeMaintenance
-      name: nodemaintenances.nodemaintenance.kubevirt.io
+      name: nodemaintenances.nodemaintenance.medik8s.io
       version: v1beta1
   description: |
     Node Maintenance Operator
@@ -109,7 +109,7 @@ spec:
           - create
           - get
         - apiGroups:
-          - nodemaintenance.kubevirt.io
+          - nodemaintenance.medik8s.io
           resources:
           - nodemaintenances
           verbs:
@@ -121,13 +121,13 @@ spec:
           - update
           - watch
         - apiGroups:
-          - nodemaintenance.kubevirt.io
+          - nodemaintenance.medik8s.io
           resources:
           - nodemaintenances/finalizers
           verbs:
           - update
         - apiGroups:
-          - nodemaintenance.kubevirt.io
+          - nodemaintenance.medik8s.io
           resources:
           - nodemaintenances/status
           verbs:
@@ -274,17 +274,17 @@ spec:
   - supported: false
     type: AllNamespaces
   keywords:
-  - KubeVirt
+  - medik8s
   - Virtualization
   - Node-maintenance
   links:
-  - name: KubeVirt
-    url: https://kubevirt.io
+  - name: medik8s
+    url: https://medik8s.io
   - name: Source Code
-    url: https://github.com/kubevirt/node-maintenance-operator
+    url: https://github.com/medik8s/node-maintenance-operator
   maintainers:
-  - email: kubevirt-dev@googlegroups.com
-    name: KubeVirt project
+  - email: kni-lifecycle-team@redhat.com
+    name: Dragonfly Team
   maturity: beta
   provider:
     name: Red Hat
@@ -299,7 +299,7 @@ spec:
     generateName: vnodemaintenance.kb.io
     rules:
     - apiGroups:
-      - nodemaintenance.kubevirt.io
+      - nodemaintenance.medik8s.io
       apiVersions:
       - v1beta1
       operations:
@@ -311,4 +311,4 @@ spec:
     targetPort: 9443
     timeoutSeconds: 15
     type: ValidatingAdmissionWebhook
-    webhookPath: /validate-nodemaintenance-kubevirt-io-v1beta1-nodemaintenance
+    webhookPath: /validate-nodemaintenance-medik8s-io-v1beta1-nodemaintenance

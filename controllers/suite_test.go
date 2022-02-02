@@ -33,7 +33,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	nodemaintenancev1beta1 "kubevirt.io/node-maintenance-operator/api/v1beta1"
+	nodemaintenancev1beta1 "medik8s.io/node-maintenance-operator/api/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 

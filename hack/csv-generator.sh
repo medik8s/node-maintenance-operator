@@ -83,5 +83,5 @@ cat ${TMP_CSV}
 rm ${TMP_CSV}
 if [ "$DUMP_CRDS" = "true" ]; then
     echo "---"
-    cat ${MANIFESTS_DIR}/nodemaintenance.kubevirt.io_nodemaintenances.yaml
+    cat ${MANIFESTS_DIR}/nodemaintenance.medik8s.io_nodemaintenances.yaml
 fi

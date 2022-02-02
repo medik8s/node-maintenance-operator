@@ -21,8 +21,8 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nmo "kubevirt.io/node-maintenance-operator/api/v1beta1"
-	nodemaintenance "kubevirt.io/node-maintenance-operator/controllers"
+	nmo "medik8s.io/node-maintenance-operator/api/v1beta1"
+	nodemaintenance "medik8s.io/node-maintenance-operator/controllers"
 )
 
 var (
@@ -203,7 +203,7 @@ var _ = Describe("Node Maintenance", func() {
 				err := Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: maintenanceNodeName}, node)
 				Expect(err).ToNot(HaveOccurred(), "failed to get node")
 				Expect(node.Spec.Unschedulable).To(BeTrue(), "node should have been unschedulable")
-				Expect(isTainted(node)).To(BeTrue(), "node should have had the kubevirt taint")
+				Expect(isTainted(node)).To(BeTrue(), "node should have had the medik8s taint")
 			})
 
 			It("should result in a valid lease object", func() {
@@ -287,7 +287,7 @@ func getNodeMaintenance(name, nodeName string) *nmo.NodeMaintenance {
 	return &nmo.NodeMaintenance{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NodeMaintenance",
-			APIVersion: "nodemaintenance.kubevirt.io/v1beta1",
+			APIVersion: "nodemaintenance.medik8s.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "nodemaintenance-" + name,
@@ -439,13 +439,13 @@ func getOperatorPod() *corev1.Pod {
 }
 
 func isTainted(node *corev1.Node) bool {
-	kubevirtDrainTaint := corev1.Taint{
-		Key:    "kubevirt.io/drain",
+	medik8sDrainTaint := corev1.Taint{
+		Key:    "medik8s.io/drain",
 		Effect: corev1.TaintEffectNoSchedule,
 	}
 	taints := node.Spec.Taints
 	for _, taint := range taints {
-		if reflect.DeepEqual(taint, kubevirtDrainTaint) {
+		if reflect.DeepEqual(taint, medik8sDrainTaint) {
 			return true
 		}
 	}

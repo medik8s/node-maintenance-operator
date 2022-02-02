@@ -39,7 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	nodemaintenancev1beta1 "kubevirt.io/node-maintenance-operator/api/v1beta1"
+	nodemaintenancev1beta1 "medik8s.io/node-maintenance-operator/api/v1beta1"
 )
 
 const (
@@ -58,9 +58,9 @@ type NodeMaintenanceReconciler struct {
 	logger           logr.Logger
 }
 
-//+kubebuilder:rbac:groups=nodemaintenance.kubevirt.io,resources=nodemaintenances,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=nodemaintenance.kubevirt.io,resources=nodemaintenances/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=nodemaintenance.kubevirt.io,resources=nodemaintenances/finalizers,verbs=update
+//+kubebuilder:rbac:groups=nodemaintenance.medik8s.io,resources=nodemaintenances,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=nodemaintenance.medik8s.io,resources=nodemaintenances/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=nodemaintenance.medik8s.io,resources=nodemaintenances/finalizers,verbs=update
 
 // TODO check if all these are really needed!
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;update;patch;watch
@@ -243,7 +243,7 @@ func initDrainer(r *NodeMaintenanceReconciler, config *rest.Config) error {
 	//This is required because VirtualMachineInstance pods are not owned by a ReplicaSet or DaemonSet controller.
 	//This means that the drain operation can’t guarantee that the pods being terminated on the target node will get
 	//re-scheduled replacements placed else where in the cluster after the pods are evicted.
-	//KubeVirt has its own controllers which manage the underlying VirtualMachineInstance pods.
+	//medik8s has its own controllers which manage the underlying VirtualMachineInstance pods.
 	//Each controller behaves differently to a VirtualMachineInstance being evicted.
 	r.drainer.Force = true
 

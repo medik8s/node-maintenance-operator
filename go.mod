@@ -1,4 +1,4 @@
-module kubevirt.io/node-maintenance-operator
+module medik8s.io/node-maintenance-operator
 
 go 1.16
 

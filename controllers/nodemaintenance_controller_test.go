@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	nodemaintenanceapi "kubevirt.io/node-maintenance-operator/api/v1beta1"
+	nodemaintenanceapi "medik8s.io/node-maintenance-operator/api/v1beta1"
 )
 
 var _ = Describe("NodeMaintenance", func() {
@@ -153,7 +153,7 @@ var _ = Describe("NodeMaintenance", func() {
 	})
 
 	Context("Node maintenance controller taint function test", func() {
-		It("should add kubevirt NoSchedule taint and keep other existing taints", func() {
+		It("should add medik8s NoSchedule taint and keep other existing taints", func() {
 			node := &corev1.Node{}
 			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, node)
 			Expect(err).NotTo(HaveOccurred())
@@ -161,7 +161,7 @@ var _ = Describe("NodeMaintenance", func() {
 			taintedNode := &corev1.Node{}
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, taintedNode)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(taintExist(taintedNode, "kubevirt.io/drain", corev1.TaintEffectNoSchedule)).To(BeTrue())
+			Expect(taintExist(taintedNode, "medik8s.io/drain", corev1.TaintEffectNoSchedule)).To(BeTrue())
 			Expect(taintExist(taintedNode, "node.kubernetes.io/unschedulable", corev1.TaintEffectNoSchedule)).To(BeTrue())
 			Expect(taintExist(taintedNode, "test", corev1.TaintEffectPreferNoSchedule)).To(BeTrue())
 
@@ -169,21 +169,21 @@ var _ = Describe("NodeMaintenance", func() {
 			//Expect(len(taintedNode.Spec.Taints)).To(Equal(3))
 		})
 
-		It("should remove kubevirt NoSchedule taint and keep other existing taints", func() {
+		It("should remove medik8s NoSchedule taint and keep other existing taints", func() {
 			node := &corev1.Node{}
 			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, node)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(taintExist(node, "kubevirt.io/drain", corev1.TaintEffectNoSchedule)).To(BeFalse())
+			Expect(taintExist(node, "medik8s.io/drain", corev1.TaintEffectNoSchedule)).To(BeFalse())
 			AddOrRemoveTaint(r.drainer.Client, node, true)
 			taintedNode := &corev1.Node{}
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, taintedNode)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(taintExist(taintedNode, "kubevirt.io/drain", corev1.TaintEffectNoSchedule)).To(BeTrue())
+			Expect(taintExist(taintedNode, "medik8s.io/drain", corev1.TaintEffectNoSchedule)).To(BeTrue())
 			AddOrRemoveTaint(r.drainer.Client, taintedNode, false)
 			unTaintedNode := &corev1.Node{}
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, unTaintedNode)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(taintExist(unTaintedNode, "kubevirt.io/drain", corev1.TaintEffectNoSchedule)).To(BeFalse())
+			Expect(taintExist(unTaintedNode, "medik8s.io/drain", corev1.TaintEffectNoSchedule)).To(BeFalse())
 			Expect(taintExist(unTaintedNode, "test", corev1.TaintEffectPreferNoSchedule)).To(BeTrue())
 
 			//Expect(len(unTaintedNode.Spec.Taints)).To(Equal(1))
@@ -212,7 +212,7 @@ var _ = Describe("NodeMaintenance", func() {
 			node := &corev1.Node{}
 			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: nm.Spec.NodeName}, node)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(taintExist(node, "kubevirt.io/drain", corev1.TaintEffectNoSchedule)).To(BeTrue())
+			Expect(taintExist(node, "medik8s.io/drain", corev1.TaintEffectNoSchedule)).To(BeTrue())
 		})
 
 		It("should fail on non existing node", func() {
