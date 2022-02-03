@@ -265,13 +265,13 @@ spec:
         serviceAccountName: node-maintenance-operator-controller-manager
     strategy: deployment
   installModes:
-  - supported: true
+  - supported: false
     type: OwnNamespace
   - supported: false
     type: SingleNamespace
   - supported: false
     type: MultiNamespace
-  - supported: false
+  - supported: true
     type: AllNamespaces
   keywords:
   - medik8s
