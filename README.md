@@ -6,7 +6,7 @@ The purpose of this operator is to watch for new or deleted custom resources cal
   - NodeMaintenance CR deleted: remove pod from maintenance and uncordon the node - set it as schedulable.
 
 > *Note*:  The current behavior of the operator is to mimic `kubectl drain <node name>`
-> as performed in [medik8s - evict all VMs and Pods on a node ](https://medik8s.io/user-guide/docs/latest/administration/node-eviction.html#how-to-evict-all-vms-and-pods-on-a-node)
+> as performed in [medik8s - evict all VMs and Pods on a node ](https://kubevirt.io/user-guide//operations/node_maintenance/#evict-all-vms-and-pods-from-a-node)
 
 ## Build and run the operator
 
@@ -129,6 +129,7 @@ The phase is updated for each processing attempt on the CR.
 For new minor releases:
 
   - create and push the `release-0.y` branch.
+  - update OpenshiftCI with new branches!
 
 For every major / minor / patch release:
 
