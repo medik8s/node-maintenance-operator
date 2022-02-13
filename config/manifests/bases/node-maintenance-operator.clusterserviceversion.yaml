@@ -47,7 +47,7 @@ spec:
   - medik8s
   - Node-maintenance
   links:
-  - name: medik8s
+  - name: Node Maintenance Operator
     url: https://medik8s.io
   - name: Source Code
     url: https://github.com/medik8s/node-maintenance-operator
@@ -56,6 +56,6 @@ spec:
     name: Medik8s Team
   maturity: beta
   provider:
-    name: medik8s
+    name: Medik8s
     url: https://github.com/medik8s
   version: 0.0.0
