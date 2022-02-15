@@ -72,7 +72,7 @@ type NodeMaintenanceStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:resource:scope=Cluster
+//+kubebuilder:resource:scope=Cluster,shortName=nm
 
 // NodeMaintenance is the Schema for the nodemaintenances API
 type NodeMaintenance struct {
