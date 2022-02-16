@@ -3,13 +3,12 @@ filters:
     reviewers:
       - beekhof
       - slintes
-      - n1r1
-      - mshitrit
       - razo7
+      - mshitrit
     approvers:
       - beekhof
       - slintes
-      - n1r1
+      - razo7   
       - mshitrit
 
     # Specify only if your Bugzilla product is not OCP
