@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -197,7 +197,7 @@ func (v *NodeMaintenanceValidator) validateMasterQuorum(nodeName string) error {
 	}
 
 	// check the etcd-quorum-guard PodDisruptionBudget if we can drain a master node
-	var pdb v1beta1.PodDisruptionBudget
+	var pdb policyv1.PodDisruptionBudget
 	key := types.NamespacedName{
 		Namespace: EtcdQuorumPDBNamespace,
 		Name:      EtcdQuorumPDBName,
