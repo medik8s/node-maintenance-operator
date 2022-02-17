@@ -222,6 +222,7 @@ spec:
                     memory: 20Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+              priorityClassName: system-cluster-critical
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: node-maintenance-operator-controller-manager
