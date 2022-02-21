@@ -2,31 +2,36 @@
 
 mkdir -p /must-gather/
 
-# generate /must-gather/version file
+# Generate /must-gather/version file
 DIR_NAME=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 . ${DIR_NAME}/version
 echo "node-maintenance-operator/must-gather" > /must-gather/version
 version >> /must-gather/version
 
-# get namespace of node-maintenance-operator
-NMO_NAMESPACE=$( oc get pods -A -l name='node-maintenance-operator' -o=jsonpath='{.items[0].metadata.namespace}{"\n"}' )
-# fallback to default
-[ -z "${NMO_NAMESPACE}" ] && NMO_NAMESPACE="openshift-operators"
+# Init named resource list, eg. ns/openshift-config
+named_resources=()
 
-# TODO get nmo logs
+# Init resource groups list, eg. pods
+group_resources=()
 
-# init resource list
-resources=()
+# Get namespace of node-maintenance-operator - where it is installed
+NMO_NAMESPACE=$(oc get subs -A --field-selector=metadata.name=node-maintenance-operator -o jsonpath='{.items[*].metadata.namespace}')
 
-# nodes
-resources+=(nodes)
+# Get nmo logs - Nodes, CRD, and CRs
+
+# Nodes
+group_resources+=(nodes)
+
+# NMO CRD
+NMO_CRD=$(oc get crds -o jsonpath='{range .items[*]}{"crd/"}{.metadata.name}{"\n"}{end}' | grep 'nodemaintenance.medik8s' | sed -z 's/\n/ /g')
+named_resources+=(${NMO_CRD})
 
 # node maintenance CRs
-resources+=(nodemaintenances)
+group_resources+=(nm)
 
-# run the collection of resources using must-gather
-for resource in ${resources[@]}; do
-  /usr/bin/oc adm inspect --dest-dir must-gather --all-namespaces ${resource}
-done
+# Run the Collection of Resources using inspect
+oc adm inspect --dest-dir must-gather --all-namespaces "${named_resources[@]}"
+group_resources_text=$(IFS=, ; echo "${group_resources[*]}")
+oc adm inspect --dest-dir must-gather --all-namespaces "${group_resources_text}"
 
 exit 0

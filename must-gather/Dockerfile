@@ -6,6 +6,10 @@ RUN microdnf install tar rsync
 # Copy must-gather required binaries
 COPY --from=builder /usr/bin/oc /usr/bin/oc
 
+# Save original gather script
+COPY --from=builder /usr/bin/gather /usr/bin/gather_original
+COPY --from=builder /usr/bin/version /usr/bin/version
+
 # Copy our scripts
 COPY collection-scripts/* /usr/bin/
 
