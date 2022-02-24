@@ -1,12 +1,15 @@
 #!/bin/bash
 
-mkdir -p /must-gather/
+# Create a directory for must-gather
+mkdir -p must-gather/operator-pod-logs/
 
 # Generate /must-gather/version file
 DIR_NAME=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 . ${DIR_NAME}/version
 echo "node-maintenance-operator/must-gather" > /must-gather/version
 version >> /must-gather/version
+
+OPERATOR_NAME="node-maintenance"
 
 # Init named resource list, eg. ns/openshift-config
 named_resources=()
@@ -17,21 +20,38 @@ group_resources=()
 # Get namespace of node-maintenance-operator - where it is installed
 NMO_NAMESPACE=$(oc get subs -A --field-selector=metadata.name=node-maintenance-operator -o jsonpath='{.items[*].metadata.namespace}')
 
-# Get nmo logs - Nodes, CRD, and CRs
+# Get NMO Information - nodes' object, CRD, pod's logs, CRs, cluster's resource usage.
 
-# Nodes
+# Get Nodes' names
+# NODES_NAMES=($(oc get nodes -o jsonpath='{.items[*].metadata.name}{"\n"}'))
+
+# Nodes' objects
 group_resources+=(nodes)
 
-# NMO CRD
+# NMO's CRD
 NMO_CRD=$(oc get crds -o jsonpath='{range .items[*]}{"crd/"}{.metadata.name}{"\n"}{end}' | grep 'nodemaintenance.medik8s' | sed -z 's/\n/ /g')
 named_resources+=(${NMO_CRD})
 
-# node maintenance CRs
+# NMO's running POD name
+NMO_PODS=($(oc get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' -n ${NMO_NAMESPACE}  | grep 'node-maintenance'))
+
+# Node Maintenance CRs
 group_resources+=(nm)
 
 # Run the Collection of Resources using inspect
 oc adm inspect --dest-dir must-gather --all-namespaces "${named_resources[@]}"
 group_resources_text=$(IFS=, ; echo "${group_resources[*]}")
 oc adm inspect --dest-dir must-gather --all-namespaces "${group_resources_text}"
+
+# Get pod's logs for only the running pods. Dismiss drained NMO pods
+for NMO_POD_NAME in ${NMO_PODS[@]}; 
+do  if  [ $(oc get pod ${NMO_POD_NAME} -n ${NMO_NAMESPACE} -o jsonpath='{.status.phase}') == "Running" ];
+then oc logs ${NMO_POD_NAME} -n ${NMO_NAMESPACE} > must-gather/operator-pod-logs/${NMO_POD_NAME}; fi; done
+
+# Get cluster's resource (CPU and Memory) usage 
+oc adm top node --use-protocol-buffers > must-gather/cluster_resoruce_statistics
+
+# Get all journal logs from each Node (TODO: select particluar journal logs, e.g., crio )
+# for NODE in ${NODES_NAMES[@]}; do oc adm node-logs ${NODE} > must-gather/nodes-logs/${NODE}; done
 
 exit 0
