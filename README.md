@@ -53,50 +53,63 @@ spec:
 $ kubectl apply -f config/samples/nodemaintenance_v1beta1_nodemaintenance.yaml
 
 $ kubectl logs <nmo-pod-name>
-{"level":"info","ts":1551794418.6742408,"logger":"controller_nodemaintenance","msg":"Reconciling NodeMaintenance","Request.Namespace":"default","Request.Name":"node02"}
-{"level":"info","ts":1551794418.674294,"logger":"controller_nodemaintenance","msg":"Applying Maintenance mode on Node: node02 with Reason: Test node maintenance","Request.Namespace":"default","Request.Name":"node02"}
-{"level":"info","ts":1551783365.7430992,"logger":"controller_nodemaintenance","msg":"WARNING: ignoring DaemonSet-managed Pods: default/local-volume-provisioner-5xft8, medik8s/disks-images-provider-bxpc5, medik8s/virt-handler-52kpr, openshift-monitoring/node-exporter-4c9jt, openshift-node/sync-8w5x8, openshift-sdn/ovs-kvz9w, openshift-sdn/sdn-qnjdz\n"}
-{"level":"info","ts":1551783365.7471824,"logger":"controller_nodemaintenance","msg":"evicting pod \"virt-operator-5559b7d86f-2wsnz\"\n"}
-{"level":"info","ts":1551783365.7472217,"logger":"controller_nodemaintenance","msg":"evicting pod \"cdi-operator-55b47b74b5-9v25c\"\n"}
-{"level":"info","ts":1551783365.747241,"logger":"controller_nodemaintenance","msg":"evicting pod \"virt-api-7fcd86776d-652tv\"\n"}
-{"level":"info","ts":1551783365.747243,"logger":"controller_nodemaintenance","msg":"evicting pod \"simple-deployment-1-m5qv9\"\n"}
-{"level":"info","ts":1551783365.7472336,"logger":"controller_nodemaintenance","msg":"evicting pod \"virt-controller-8987cffb8-29w26\"\n"}
+022-02-23T07:33:58.924Z INFO controller-runtime.manager.controller.nodemaintenance Reconciling NodeMaintenance {"reconciler group": "nodemaintenance.medik8s.io", "reconciler kind": "NodeMaintenance", "name": "nodemaintenance-sample", "namespace": ""}
+2022-02-23T07:33:59.266Z INFO controller-runtime.manager.controller.nodemaintenance Applying maintenance mode {"reconciler group": "nodemaintenance.medik8s.io", "reconciler kind": "NodeMaintenance", "name": "nodemaintenance-sample", "namespace": "", "node": "node02", "reason": "Test node maintenance"}
+time="2022-02-24T11:58:20Z" level=info msg="Maintenance taints will be added to node node02"
+time="2022-02-24T11:58:20Z" level=info msg="Applying medik8s.io/drain taint add on Node: node02"
+time="2022-02-24T11:58:20Z" level=info msg="Patching taints on Node: node02"
+2022-02-23T07:33:59.336Z INFO controller-runtime.manager.controller.nodemaintenance Evict all Pods from Node {"reconciler group": "nodemaintenance.medik8s.io", "reconciler kind": "NodeMaintenance", "name": "nodemaintenance-sample", "namespace": "", "nodeName": "node02"}
+E0223 07:33:59.498801 1 nodemaintenance_controller.go:449] WARNING: ignoring DaemonSet-managed Pods: openshift-cluster-node-tuning-operator/tuned-jrprj, openshift-dns/dns-default-kf6jj, openshift-dns/node-resolver-72jzb, openshift-image-registry/node-ca-czgc6, openshift-ingress-canary/ingress-canary-44tgv, openshift-machine-config-operator/machine-config-daemon-csv6c, openshift-monitoring/node-exporter-rzwhz, openshift-multus/multus-additional-cni-plugins-829bh, openshift-multus/multus-qwfc9, openshift-multus/network-metrics-daemon-pxt6n, openshift-network-diagnostics/network-check-target-qqcbr, openshift-sdn/sdn-s5cqx; deleting Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet: openshift-marketplace/nmo-downstream-8-8nms7
+I0223 07:33:59.500418 1 nodemaintenance_controller.go:449] evicting pod openshift-network-diagnostics/network-check-source-865d4b5578-n2cxg
+I0223 07:33:59.500790 1 nodemaintenance_controller.go:449] evicting pod openshift-ingress/router-default-7548cf6fb5-rgxrq
+I0223 07:33:59.500944 1 nodemaintenance_controller.go:449] evicting pod openshift-marketplace/12a4cfa0c2be01867daf1d9b7ad7c0ae7a988fd957a2ad6df0d72ff6875lhcx
+I0223 07:33:59.501061 1 nodemaintenance_controller.go:449] evicting pod openshift-marketplace/nmo-downstream-8-8nms7
 ...
 ```
 
 ### Set Maintenance off - Delete the NodeMaintenance CR
 
-To remove maintenance from a node, delete the corresponding `NodeMaintenance` CR:
+To remove maintenance from a node, delete the corresponding `NodeMaintenance` (or `nm` which is a shortName) CR:
 
 ```sh
-$ kubectl delete nodemaintenance nodemaintenance-sample
-
+$ kubectl delete nm nodemaintenance-sample
+nodemaintenance.nodemaintenance.medik8s.io "nodemaintenance-sample" deleted
 $ kubectl logs <nmo-pod-name>
-{"level":"info","ts":1551794725.0018933,"logger":"controller_nodemaintenance","msg":"Reconciling NodeMaintenance","Request.Namespace":"default","Request.Name":"node02"}
-{"level":"info","ts":1551794725.0021605,"logger":"controller_nodemaintenance","msg":"NodeMaintenance Object: default/node02 Deleted ","Request.Namespace":"default","Request.Name":"node02"}
-{"level":"info","ts":1551794725.0022023,"logger":"controller_nodemaintenance","msg":"uncordon Node: node02"}
-
+2022-02-24T14:27:35.332Z INFO controller-runtime.manager.controller.nodemaintenance Reconciling NodeMaintenance {"reconciler group": "nodemaintenance.medik8s.io", "reconciler kind": "NodeMaintenance", "name": "nodemaintenance-sample", "namespace": ""}
+time="2022-02-24T14:27:35Z" level=info msg="Maintenance taints will be removed from node node02"
+time="2022-02-24T14:27:35Z" level=info msg="Applying medik8s.io/drain taint remove on Node: node02"
+...
 ```
 
 ## NodeMaintenance Status
 
-The NodeMaintenance CR can contain the following status fields:
+The `NodeMaintenance` CR can contain the following status fields:
 
 ```yaml
+$ kubectl get nm nodemaintenance-sample -o yaml
 apiVersion: nodemaintenance.medik8s.io/v1beta1
 kind: NodeMaintenance
 metadata:
-  name: nodemaintenance-xyz
+  creationTimestamp: "2022-02-24T14:37:25Z"
+  finalizers:
+  - foregroundDeleteNodeMaintenance
+  generation: 1
+  name: nodemaintenance-sample
+  resourceVersion: "1267741"
+  uid: 83cece87-f05c-41e8-bc22-5e6e0114f4b7
 spec:
   nodeName: node02
-  reason: "Test node maintenance"
+  reason: Test node maintenance
 status:
-  phase: "Running"
-  lastError: "Last failure message"
-  pendingPods: [pod-A,pod-B,pod-C]
-  totalPods: 5
-  evictionPods: 3
-
+  evictionPods: 5
+  pendingPods:
+  - router-default-7548cf6fb5-6c6ws
+  - alertmanager-main-1
+  - prometheus-adapter-7b5bf59787-ccf5w
+  - prometheus-k8s-1
+  - thanos-querier-6dffd47d65-h4d5c
+  phase: Running
+  totalpods: 19
 ```
 
 `phase` is the representation of the maintenance progress and can hold a string value of: Running|Succeeded.
