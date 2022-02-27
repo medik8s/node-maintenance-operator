@@ -20,12 +20,12 @@ spec:
       name: nodemaintenances.nodemaintenance.medik8s.io
       version: v1beta1
   description: |
-    Node Maintenance Operator
+    Node Maintenance Operator (NMO)
 
-    This operator will keep nodes cordoned and drained while a matching node maintenance CR exists.
+    This operator will keep nodes cordoned and drained while a matching NodeMaintenance (nm) custom resource exists.
     This is useful when investigating problems with a machine, or performing an operation on the underlying machine that might result in node failure.
 
-    Primarily used in bare-metal environments.
+    This is a stanalone version of NMO, for use in clusters without OpenShift Virtualizaiton installed.
   displayName: Node Maintenance Operator
   icon:
   - base64data: ""
