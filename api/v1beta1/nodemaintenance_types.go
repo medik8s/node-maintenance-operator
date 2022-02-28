@@ -46,8 +46,10 @@ type NodeMaintenanceSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Node name to apply maintanance on/off
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	NodeName string `json:"nodeName"`
 	// Reason for maintanance
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	Reason string `json:"reason,omitempty"`
 }
 
@@ -57,16 +59,22 @@ type NodeMaintenanceStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Phase is the represtation of the maintenance progress (Running,Succeeded,Failed)
+	//+operator-sdk:csv:customresourcedefinitions:type=status
 	Phase MaintenancePhase `json:"phase,omitempty"`
 	// LastError represents the latest error if any in the latest reconciliation
+	//+operator-sdk:csv:customresourcedefinitions:type=status
 	LastError string `json:"lastError,omitempty"`
 	// PendingPods is a list of pending pods for eviction
+	//+operator-sdk:csv:customresourcedefinitions:type=status
 	PendingPods []string `json:"pendingPods,omitempty"`
 	// TotalPods is the total number of all pods on the node from the start
+	//+operator-sdk:csv:customresourcedefinitions:type=status
 	TotalPods int `json:"totalpods,omitempty"`
 	// EvictionPods is the total number of pods up for eviction from the start
+	//+operator-sdk:csv:customresourcedefinitions:type=status
 	EvictionPods int `json:"evictionPods,omitempty"`
 	// Consecutive number of errors upon obtaining a lease
+	//+operator-sdk:csv:customresourcedefinitions:type=status
 	ErrorOnLeaseCount int `json:"errorOnLeaseCount,omitempty"`
 }
 
@@ -75,6 +83,7 @@ type NodeMaintenanceStatus struct {
 //+kubebuilder:resource:scope=Cluster,shortName=nm
 
 // NodeMaintenance is the Schema for the nodemaintenances API
+// +operator-sdk:csv:customresourcedefinitions:resources={{"NodeMaintenance","v1beta1","nodemaintenances"}}
 type NodeMaintenance struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -33,6 +33,38 @@ spec:
       displayName: Node Maintenance
       kind: NodeMaintenance
       name: nodemaintenances.nodemaintenance.medik8s.io
+      resources:
+      - kind: NodeMaintenance
+        name: nodemaintenances
+        version: v1beta1
+      specDescriptors:
+      - description: Node name to apply maintanance on/off
+        displayName: Node Name
+        path: nodeName
+      - description: Reason for maintanance
+        displayName: Reason
+        path: reason
+      statusDescriptors:
+      - description: Consecutive number of errors upon obtaining a lease
+        displayName: Error On Lease Count
+        path: errorOnLeaseCount
+      - description: EvictionPods is the total number of pods up for eviction from
+          the start
+        displayName: Eviction Pods
+        path: evictionPods
+      - description: LastError represents the latest error if any in the latest reconciliation
+        displayName: Last Error
+        path: lastError
+      - description: PendingPods is a list of pending pods for eviction
+        displayName: Pending Pods
+        path: pendingPods
+      - description: Phase is the represtation of the maintenance progress (Running,Succeeded,Failed)
+        displayName: Phase
+        path: phase
+      - description: TotalPods is the total number of all pods on the node from the
+          start
+        displayName: Total Pods
+        path: totalpods
       version: v1beta1
   description: |
     Node Maintenance Operator (NMO)
