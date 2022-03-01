@@ -1,27 +1,26 @@
-# Node Maintenance Operator
+# Node Maintenance Operator (NMO)
 
-The node-maintenance-operator is an operator generated from the [operator-sdk](https://github.com/operator-framework/operator-sdk).
-The purpose of this operator is to watch for new or deleted custom resources called NodeMaintenance which indicate that a node in the cluster should either:
-  - NodeMaintenance CR created: move node into maintenance, cordon the node - set it as unschedulable and evict the pods (which can be evicted) from that node.
-  - NodeMaintenance CR deleted: remove pod from maintenance and uncordon the node - set it as schedulable.
+The node-maintenance-operator (NMO) is an operator generated from the [operator-sdk](https://github.com/operator-framework/operator-sdk).
+The purpose of this operator is to watch for new or deleted custom resources (CRs) called `NodeMaintenance` which indicate that a node in the cluster should either:
+  - `NodeMaintenance` CR created: move node into maintenance, cordon the node - set it as unschedulable, and evict the pods (which can be evicted) from that node.
+  - `NodeMaintenance` CR deleted: remove pod from maintenance and uncordon the node - set it as schedulable.
 
-> *Note*:  The current behavior of the operator is to mimic `kubectl drain <node name>`
-> as performed in [medik8s - evict all VMs and Pods on a node ](https://kubevirt.io/user-guide//operations/node_maintenance/#evict-all-vms-and-pods-from-a-node)
+> *Note*:  The current behavior of the operator is to mimic `kubectl drain <node name>`.
 
 ## Build and run the operator
 
 There are two ways to run the operator:
 
-- Deploy the latest version, which was built from master branch, to a running Openshift/Kubernetes cluster.
-- Build and run or deploy from sources to a running or to be created Openshift/Kubernetes cluster.
+- Deploy the latest version, which was built from master branch, to a running OpenShift/Kubernetes cluster.
+- Build and deploy from sources to a running or to be created OpenShift/Kubernetes cluster.
 
 ### Deploy the latest version
 
 After every PR merge to master images were build and pushed to `quay.io`.
 For deployment of NMO using these images you need:
 
-- a running Openshift cluster, or a Kubernetes cluster with OLM installed.
-- `operator-sdk` binary installed, see https://sdk.operatorframework.io/docs/installation/
+- a running OpenShift cluster, or a Kubernetes cluster with Operator Lifecycle Manager (OLM) installed.
+- `operator-sdk` binary installed, see https://sdk.operatorframework.io/docs/installation/.
 - a valid `$KUBECONFIG` configured to access your cluster.
 
 Then run `operator-sdk run bundle quay.io/medik8s/node-maintenance-operator-bundle:latest`
@@ -34,10 +33,10 @@ Follow the instructions [here](https://sdk.operatorframework.io/docs/building-op
 
 ### Set Maintenance on - Create a NodeMaintenance CR
 
-To set maintenance on a node a `NodeMaintenance` CustomResource should be created.
+To set maintenance on a node a `NodeMaintenance` custom resource should be created.
 The `NodeMaintenance` CR spec contains:
-- nodeName: The name of the node which will be put into maintenance.
-- reason: the reason for the node maintenance.
+- nodeName: The name of the node which will be put into maintenance mode.
+- reason: The reason why the node will be under maintenance.
 
 Create the example `NodeMaintenance` CR found at `config/samples/nodemaintenance_v1beta1_nodemaintenance.yaml`:
 
@@ -54,62 +53,75 @@ spec:
 $ kubectl apply -f config/samples/nodemaintenance_v1beta1_nodemaintenance.yaml
 
 $ kubectl logs <nmo-pod-name>
-{"level":"info","ts":1551794418.6742408,"logger":"controller_nodemaintenance","msg":"Reconciling NodeMaintenance","Request.Namespace":"default","Request.Name":"node02"}
-{"level":"info","ts":1551794418.674294,"logger":"controller_nodemaintenance","msg":"Applying Maintenance mode on Node: node02 with Reason: Test node maintenance","Request.Namespace":"default","Request.Name":"node02"}
-{"level":"info","ts":1551783365.7430992,"logger":"controller_nodemaintenance","msg":"WARNING: ignoring DaemonSet-managed Pods: default/local-volume-provisioner-5xft8, medik8s/disks-images-provider-bxpc5, medik8s/virt-handler-52kpr, openshift-monitoring/node-exporter-4c9jt, openshift-node/sync-8w5x8, openshift-sdn/ovs-kvz9w, openshift-sdn/sdn-qnjdz\n"}
-{"level":"info","ts":1551783365.7471824,"logger":"controller_nodemaintenance","msg":"evicting pod \"virt-operator-5559b7d86f-2wsnz\"\n"}
-{"level":"info","ts":1551783365.7472217,"logger":"controller_nodemaintenance","msg":"evicting pod \"cdi-operator-55b47b74b5-9v25c\"\n"}
-{"level":"info","ts":1551783365.747241,"logger":"controller_nodemaintenance","msg":"evicting pod \"virt-api-7fcd86776d-652tv\"\n"}
-{"level":"info","ts":1551783365.747243,"logger":"controller_nodemaintenance","msg":"evicting pod \"simple-deployment-1-m5qv9\"\n"}
-{"level":"info","ts":1551783365.7472336,"logger":"controller_nodemaintenance","msg":"evicting pod \"virt-controller-8987cffb8-29w26\"\n"}
+022-02-23T07:33:58.924Z INFO controller-runtime.manager.controller.nodemaintenance Reconciling NodeMaintenance {"reconciler group": "nodemaintenance.medik8s.io", "reconciler kind": "NodeMaintenance", "name": "nodemaintenance-sample", "namespace": ""}
+2022-02-23T07:33:59.266Z INFO controller-runtime.manager.controller.nodemaintenance Applying maintenance mode {"reconciler group": "nodemaintenance.medik8s.io", "reconciler kind": "NodeMaintenance", "name": "nodemaintenance-sample", "namespace": "", "node": "node02", "reason": "Test node maintenance"}
+time="2022-02-24T11:58:20Z" level=info msg="Maintenance taints will be added to node node02"
+time="2022-02-24T11:58:20Z" level=info msg="Applying medik8s.io/drain taint add on Node: node02"
+time="2022-02-24T11:58:20Z" level=info msg="Patching taints on Node: node02"
+2022-02-23T07:33:59.336Z INFO controller-runtime.manager.controller.nodemaintenance Evict all Pods from Node {"reconciler group": "nodemaintenance.medik8s.io", "reconciler kind": "NodeMaintenance", "name": "nodemaintenance-sample", "namespace": "", "nodeName": "node02"}
+E0223 07:33:59.498801 1 nodemaintenance_controller.go:449] WARNING: ignoring DaemonSet-managed Pods: openshift-cluster-node-tuning-operator/tuned-jrprj, openshift-dns/dns-default-kf6jj, openshift-dns/node-resolver-72jzb, openshift-image-registry/node-ca-czgc6, openshift-ingress-canary/ingress-canary-44tgv, openshift-machine-config-operator/machine-config-daemon-csv6c, openshift-monitoring/node-exporter-rzwhz, openshift-multus/multus-additional-cni-plugins-829bh, openshift-multus/multus-qwfc9, openshift-multus/network-metrics-daemon-pxt6n, openshift-network-diagnostics/network-check-target-qqcbr, openshift-sdn/sdn-s5cqx; deleting Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet: openshift-marketplace/nmo-downstream-8-8nms7
+I0223 07:33:59.500418 1 nodemaintenance_controller.go:449] evicting pod openshift-network-diagnostics/network-check-source-865d4b5578-n2cxg
+I0223 07:33:59.500790 1 nodemaintenance_controller.go:449] evicting pod openshift-ingress/router-default-7548cf6fb5-rgxrq
+I0223 07:33:59.500944 1 nodemaintenance_controller.go:449] evicting pod openshift-marketplace/12a4cfa0c2be01867daf1d9b7ad7c0ae7a988fd957a2ad6df0d72ff6875lhcx
+I0223 07:33:59.501061 1 nodemaintenance_controller.go:449] evicting pod openshift-marketplace/nmo-downstream-8-8nms7
 ...
 ```
 
 ### Set Maintenance off - Delete the NodeMaintenance CR
 
-To remove maintenance from a node, delete the corresponding `NodeMaintenance` CR:
+To remove maintenance from a node, delete the corresponding `NodeMaintenance` (or `nm` which is a shortName) CR:
 
 ```sh
-$ kubectl delete nodemaintenance nodemaintenance-sample
-
+$ kubectl delete nm nodemaintenance-sample
+nodemaintenance.nodemaintenance.medik8s.io "nodemaintenance-sample" deleted
 $ kubectl logs <nmo-pod-name>
-{"level":"info","ts":1551794725.0018933,"logger":"controller_nodemaintenance","msg":"Reconciling NodeMaintenance","Request.Namespace":"default","Request.Name":"node02"}
-{"level":"info","ts":1551794725.0021605,"logger":"controller_nodemaintenance","msg":"NodeMaintenance Object: default/node02 Deleted ","Request.Namespace":"default","Request.Name":"node02"}
-{"level":"info","ts":1551794725.0022023,"logger":"controller_nodemaintenance","msg":"uncordon Node: node02"}
-
+2022-02-24T14:27:35.332Z INFO controller-runtime.manager.controller.nodemaintenance Reconciling NodeMaintenance {"reconciler group": "nodemaintenance.medik8s.io", "reconciler kind": "NodeMaintenance", "name": "nodemaintenance-sample", "namespace": ""}
+time="2022-02-24T14:27:35Z" level=info msg="Maintenance taints will be removed from node node02"
+time="2022-02-24T14:27:35Z" level=info msg="Applying medik8s.io/drain taint remove on Node: node02"
+...
 ```
 
 ## NodeMaintenance Status
 
-The NodeMaintenance CR can contain the following status fields:
+The `NodeMaintenance` CR can contain the following status fields:
 
 ```yaml
+$ kubectl get nm nodemaintenance-sample -o yaml
 apiVersion: nodemaintenance.medik8s.io/v1beta1
 kind: NodeMaintenance
 metadata:
-  name: nodemaintenance-xyz
+  name: nodemaintenance-sample
 spec:
   nodeName: node02
-  reason: "Test node maintenance"
+  reason: Test node maintenance
 status:
-  phase: "Running"
-  lastError: "Last failure message"
-  pendingPods: [pod-A,pod-B,pod-C]
-  totalPods: 5
-  evictionPods: 3
-
+  evictionPods: 5
+  lastError: 'Last failure message'
+  pendingPods:
+  - pod-A
+  - pod-B
+  - pod-C
+  - pod-D
+  - pod-E
+  phase: Running
+  totalpods: 19
 ```
 
-`phase` is the representation of the maintenance progress and can hold a string value of: Running|Succeeded.
-The phase is updated for each processing attempt on the CR.
+`evictionPods` is the total number of pods up for eviction from the start.
 
 `lastError` represents the latest error if any for the latest reconciliation.
 
 `pendingPods` PendingPods is a list of pending pods for eviction.
 
+`phase` is the representation of the maintenance progress and can hold a string value of: Running|Succeeded.
+The phase is updated for each processing attempt on the CR.
+
 `totalPods` is the total number of all pods on the node from the start.
 
-`evictionPods` is the total number of pods up for eviction from the start.
+## Debug
+### Collecting cluster data with must-gather
+
+Use NMO's must-gather from [here](https://github.com/medik8s/node-maintenance-operator/tree/master/must-gather) to collect related debug data.
 
 ## Tests
 
