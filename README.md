@@ -1,7 +1,7 @@
-# Node Maintenance Operator
+# Node Maintenance Operator (NMO)
 
-The node-maintenance-operator is an operator generated from the [operator-sdk](https://github.com/operator-framework/operator-sdk).
-The purpose of this operator is to watch for new or deleted custom resources called `NodeMaintenance` which indicate that a node in the cluster should either:
+The node-maintenance-operator (NMO) is an operator generated from the [operator-sdk](https://github.com/operator-framework/operator-sdk).
+The purpose of this operator is to watch for new or deleted custom resources (CRs) called `NodeMaintenance` which indicate that a node in the cluster should either:
   - `NodeMaintenance` CR created: move node into maintenance, cordon the node - set it as unschedulable, and evict the pods (which can be evicted) from that node.
   - `NodeMaintenance` CR deleted: remove pod from maintenance and uncordon the node - set it as schedulable.
 
@@ -19,7 +19,7 @@ There are two ways to run the operator:
 After every PR merge to master images were build and pushed to `quay.io`.
 For deployment of NMO using these images you need:
 
-- a running OpenShift cluster, or a Kubernetes cluster with OLM installed.
+- a running OpenShift cluster, or a Kubernetes cluster with Operator Lifecycle Manager (OLM) installed.
 - `operator-sdk` binary installed, see https://sdk.operatorframework.io/docs/installation/.
 - a valid `$KUBECONFIG` configured to access your cluster.
 
@@ -33,7 +33,7 @@ Follow the instructions [here](https://sdk.operatorframework.io/docs/building-op
 
 ### Set Maintenance on - Create a NodeMaintenance CR
 
-To set maintenance on a node a `NodeMaintenance` CustomResource should be created.
+To set maintenance on a node a `NodeMaintenance` custom resource should be created.
 The `NodeMaintenance` CR spec contains:
 - nodeName: The name of the node which will be put into maintenance mode.
 - reason: The reason why the node will be under maintenance.
@@ -90,38 +90,38 @@ $ kubectl get nm nodemaintenance-sample -o yaml
 apiVersion: nodemaintenance.medik8s.io/v1beta1
 kind: NodeMaintenance
 metadata:
-  creationTimestamp: "2022-02-24T14:37:25Z"
-  finalizers:
-  - foregroundDeleteNodeMaintenance
-  generation: 1
   name: nodemaintenance-sample
-  resourceVersion: "1267741"
-  uid: 83cece87-f05c-41e8-bc22-5e6e0114f4b7
 spec:
   nodeName: node02
   reason: Test node maintenance
 status:
   evictionPods: 5
+  lastError: 'Last failure message'
   pendingPods:
-  - router-default-7548cf6fb5-6c6ws
-  - alertmanager-main-1
-  - prometheus-adapter-7b5bf59787-ccf5w
-  - prometheus-k8s-1
-  - thanos-querier-6dffd47d65-h4d5c
+  - pod-A
+  - pod-B
+  - pod-C
+  - pod-D
+  - pod-E
   phase: Running
   totalpods: 19
 ```
 
-`phase` is the representation of the maintenance progress and can hold a string value of: Running|Succeeded.
-The phase is updated for each processing attempt on the CR.
+`evictionPods` is the total number of pods up for eviction from the start.
 
 `lastError` represents the latest error if any for the latest reconciliation.
 
 `pendingPods` PendingPods is a list of pending pods for eviction.
 
+`phase` is the representation of the maintenance progress and can hold a string value of: Running|Succeeded.
+The phase is updated for each processing attempt on the CR.
+
 `totalPods` is the total number of all pods on the node from the start.
 
-`evictionPods` is the total number of pods up for eviction from the start.
+## Debug
+### Collecting cluster data with must-gather
+
+Use NMO's must-gather from [here](https://github.com/medik8s/node-maintenance-operator/tree/master/must-gather) to collect related debug data.
 
 ## Tests
 
