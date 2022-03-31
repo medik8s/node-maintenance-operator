@@ -8,7 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -97,7 +97,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 
 			Context("with potential quorum violation", func() {
 
-				var pdb *v1beta1.PodDisruptionBudget
+				var pdb *policyv1.PodDisruptionBudget
 
 				BeforeEach(func() {
 					pdb = getTestPDB()
@@ -121,7 +121,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 
 			Context("without potential quorum violation", func() {
 
-				var pdb *v1beta1.PodDisruptionBudget
+				var pdb *policyv1.PodDisruptionBudget
 
 				BeforeEach(func() {
 					pdb = getTestPDB()
@@ -202,8 +202,8 @@ func getTestNode(name string, isMaster bool) *v1.Node {
 	return node
 }
 
-func getTestPDB() *v1beta1.PodDisruptionBudget {
-	return &v1beta1.PodDisruptionBudget{
+func getTestPDB() *policyv1.PodDisruptionBudget {
+	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: EtcdQuorumPDBNamespace,
 			Name:      EtcdQuorumPDBName,
