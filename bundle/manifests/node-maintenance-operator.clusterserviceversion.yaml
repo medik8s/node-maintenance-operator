@@ -18,11 +18,13 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
+    containerImage: ""
+    createdAt: ""
     description: Node Maintenance Operator for cordoning and draining nodes.
-    operators.openshift.io/infrastructure-features: '["disconnected"]'
     operators.operatorframework.io/builder: operator-sdk-v1.11.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/medik8s/node-maintenance-operator
+    support: Medik8s
   name: node-maintenance-operator.v0.0.1
   namespace: placeholder
 spec:
@@ -285,6 +287,7 @@ spec:
   - email: medik8s@googlegroups.com
     name: Medik8s Team
   maturity: beta
+  minKubeVersion: 1.23.0
   provider:
     name: medik8s
     url: https://github.com/medik8s
