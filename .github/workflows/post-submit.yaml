@@ -2,7 +2,6 @@ name: Publish Container Images on PR merges and for tags
 on:
   push:
     branches:
-      - master
       - main
     tags:
       - 'v*'
@@ -24,7 +23,7 @@ jobs:
           password: ${{ secrets.QUAY_PASSWORD }}
           registry: quay.io
 
-      - name: Build and push CSV 0.0.1 + latest images for PR merges to master/main
+      - name: Build and push CSV 0.0.1 + latest images for PR merges to main
         if: ${{ github.ref_type != 'tag' }}
         run: export IMAGE_REGISTRY=quay.io/medik8s && make container-build container-push must-gather-build must-gather-push
 

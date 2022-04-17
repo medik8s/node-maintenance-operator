@@ -11,12 +11,12 @@ The purpose of this operator is to watch for new or deleted custom resources (CR
 
 There are two ways to run the operator:
 
-- Deploy the latest version, which was built from master branch, to a running OpenShift/Kubernetes cluster.
+- Deploy the latest version, which was built from the `main` branch, to a running OpenShift/Kubernetes cluster.
 - Build and deploy from sources to a running or to be created OpenShift/Kubernetes cluster.
 
 ### Deploy the latest version
 
-After every PR merge to master images were build and pushed to `quay.io`.
+After every PR merge to `main` branch images were build and pushed to `quay.io`.
 For deployment of NMO using these images you need:
 
 - a running OpenShift cluster, or a Kubernetes cluster with Operator Lifecycle Manager (OLM) installed.
@@ -121,7 +121,7 @@ The phase is updated for each processing attempt on the CR.
 ## Debug
 ### Collecting cluster data with must-gather
 
-Use NMO's must-gather from [here](https://github.com/medik8s/node-maintenance-operator/tree/master/must-gather) to collect related debug data.
+Use NMO's must-gather from [here](https://github.com/medik8s/node-maintenance-operator/tree/main/must-gather) to collect related debug data.
 
 ## Tests
 
