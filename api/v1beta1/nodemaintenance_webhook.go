@@ -41,7 +41,7 @@ const (
 )
 
 const (
-	EtcdQuorumPDBName      = "etcd-quorum-guard"
+	EtcdQuorumPDBName      = "etcd-guard-pdb"
 	EtcdQuorumPDBNamespace = "openshift-etcd"
 	LabelNameRoleMaster    = "node-role.kubernetes.io/master"
 )
