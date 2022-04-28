@@ -206,7 +206,7 @@ func getTestPDB() *policyv1.PodDisruptionBudget {
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: EtcdQuorumPDBNamespace,
-			Name:      EtcdQuorumPDBName,
+			Name:      EtcdQuorumPDBNewName,
 		},
 	}
 }
