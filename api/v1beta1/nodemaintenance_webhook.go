@@ -41,7 +41,8 @@ const (
 )
 
 const (
-	EtcdQuorumPDBName      = "etcd-guard-pdb"
+	EtcdQuorumPDBNewName   = "etcd-guard-pdb"    // The new name of the PDB - From OCP 4.11
+	EtcdQuorumPDBOldName   = "etcd-quorum-guard" // The old name of the PDB - Up to OCP 4.10
 	EtcdQuorumPDBNamespace = "openshift-etcd"
 	LabelNameRoleMaster    = "node-role.kubernetes.io/master"
 )
@@ -197,20 +198,29 @@ func (v *NodeMaintenanceValidator) validateMasterQuorum(nodeName string) error {
 	}
 
 	// check the etcd-quorum-guard PodDisruptionBudget if we can drain a master node
-	var pdb policyv1.PodDisruptionBudget
-	key := types.NamespacedName{
-		Namespace: EtcdQuorumPDBNamespace,
-		Name:      EtcdQuorumPDBName,
-	}
-	if err := v.client.Get(context.TODO(), key, &pdb); err != nil {
-		if apierrors.IsNotFound(err) {
-			// TODO do we need a fallback for k8s clusters?
-			nodemaintenancelog.Info("etcd-quorum-guard PDB not found. Skipping master quorum validation.")
-			return nil
+	disruptionsAllowed := int32(-1)
+	for _, pdbName := range []string{EtcdQuorumPDBNewName, EtcdQuorumPDBOldName} {
+		var pdb policyv1.PodDisruptionBudget
+		key := types.NamespacedName{
+			Namespace: EtcdQuorumPDBNamespace,
+			Name:      pdbName,
 		}
-		return fmt.Errorf("could not get etcd-quorum-guard PDB for master quorum validation, please try again: %v", err)
+		if err := v.client.Get(context.TODO(), key, &pdb); err != nil {
+			if apierrors.IsNotFound(err) {
+				// try next one
+				continue
+			}
+			return fmt.Errorf("could not get the etcd quorum guard PDB for master quorum validation, please try again: %v", err)
+		}
+		disruptionsAllowed = pdb.Status.DisruptionsAllowed
+		break
 	}
-	if pdb.Status.DisruptionsAllowed == 0 {
+	if disruptionsAllowed == -1 {
+		// TODO do we need a fallback for k8s clusters?
+		nodemaintenancelog.Info("etcd quorum guard PDB hasn't been found. Skipping master quorum validation.")
+		return nil
+	}
+	if disruptionsAllowed == 0 {
 		return fmt.Errorf(ErrorMasterQuorumViolation)
 	}
 	return nil
