@@ -9,7 +9,7 @@ on:
       - main
       - release-*
 jobs:
-  test-and-build:
+  build:
     name: Test and build PRs
     runs-on: ubuntu-20.04
     steps:
