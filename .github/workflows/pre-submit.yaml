@@ -1,5 +1,6 @@
-name: Tests and build open and merged PRs
-on:
+# Understanding the workflow file - https://docs.github.com/en/actions/learn-github-actions/understanding-github-actions#understanding-the-workflow-file
+name: Pre Submit # workflow name
+on: # on events
   push:
     branches:
       - main
@@ -8,13 +9,13 @@ on:
     branches:
       - main
       - release-*
-jobs:
+jobs: # jobs to run
   build:
     name: Test and build PRs
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-20.04 # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#choosing-github-hosted-runners
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
