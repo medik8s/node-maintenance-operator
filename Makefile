@@ -155,8 +155,7 @@ go-verify: go-tidy go-vendor # Run go mod verify - verify dependencies have expe
 	go mod verify
 
 .PHONY: test
-test: test-no-verify ## Generate and format code, run tests, generate manifests and bundle, and verify no uncommitted changes
-	verify-unchanged
+test: test-no-verify verify-unchanged ## Generate and format code, run tests, generate manifests and bundle, and verify no uncommitted changes
 
 .PHONY: test-no-verify
 test-no-verify: manifests generate go-verify fmt vet envtest ginkgo ## Generate and format code, and run tests
