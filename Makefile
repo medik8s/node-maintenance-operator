@@ -363,4 +363,4 @@ container-push:  ## Push containers (NOTE: catalog can't be build before bundle 
 
 .PHONY: cluster-functest 
 cluster-functest: ginkgo ## Run e2e tests in a real cluster
-	./hack/functest.sh
+	./hack/functest.sh $(GINKGO_VERSION)
