@@ -1,4 +1,25 @@
+## Tool Versions
+
+# See https://github.com/kubernetes-sigs/kustomize for the last version
+KUSTOMIZE_VERSION ?= v4@v4.5.5
+# https://github.com/kubernetes-sigs/controller-tools/releases for the last version
+CONTROLLER_GEN_VERSION ?= v0.6.1
+# See https://pkg.go.dev/sigs.k8s.io/controller-runtime/tools/setup-envtest?tab=versions for the last version
+ENVTEST_VERSION ?= v0.0.0-20220513175748-3f265c36d7bf
+# See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
+GOIMPORTS_VERSION ?= v0.1.7
+# See https://github.com/onsi/ginkgo/releases for the last version
+GINKGO_VERSION ?= v1.16.5
+# See github.com/operator-framework/operator-registry/releases for the last version
+OPM_VERSION ?= v1.12.0
+# See github.com/operator-framework/operator-sdk/releases for the last version
+OPERATOR_SDK_VERSION ?= v1.12.0
+# GO_VERSION refers to the version of Golang to be downloaded when running dockerized version
 GO_VERSION = 1.16
+# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
+ENVTEST_K8S_VERSION = 1.21
+
+
 # IMAGE_REGISTRY used to indicate the registery/group for the operator, bundle and catalog
 IMAGE_REGISTRY ?= quay.io/medik8s
 export IMAGE_REGISTRY
@@ -69,9 +90,6 @@ MUST_GATHER_IMAGE ?= $(IMAGE_TAG_BASE)-must-gather:$(IMAGE_TAG)
 
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
-
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.21
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -159,7 +177,7 @@ test: test-no-verify verify-unchanged ## Generate and format code, run tests, ge
 
 .PHONY: test-no-verify
 test-no-verify: manifests generate go-verify fmt vet envtest ginkgo ## Generate and format code, and run tests
-	ACK_GINKGO_DEPRECATIONS=1.16.4 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(PROJECT_DIR)/bin)" $(GINKGO) -v -r --keepGoing -requireSuite ./api/... ./controllers/... -coverprofile cover.out
+	ACK_GINKGO_DEPRECATIONS=$(GINKGO_VERSION) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -v -r --keepGoing -requireSuite ./api/... ./controllers/... -coverprofile cover.out
 
 ##@ Build
 
@@ -206,42 +224,66 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete -f -
 
-CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
-.PHONY: controller-gen
-controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.1)
+##@ Build Dependencies
 
-KUSTOMIZE = $(shell pwd)/bin/kustomize
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
+
+## Default Tool Binaries
+KUSTOMIZE_DIR ?= $(LOCALBIN)/kustomize
+CONTROLLER_GEN_DIR ?= $(LOCALBIN)/controller-gen
+ENVTEST_DIR ?= $(LOCALBIN)/setup-envtest
+GOIMPORTS_DIR ?= $(LOCALBIN)/goimports
+GINKGO_DIR ?= $(LOCALBIN)/ginkgo
+OPM_DIR = $(LOCALBIN)/opm
+OPERATOR_SDK_DIR ?= $(LOCALBIN)/operator-sdk
+
+## Specific Tool Binaries
+KUSTOMIZE = $(KUSTOMIZE_DIR)/$(KUSTOMIZE_VERSION)/kustomize
+CONTROLLER_GEN = $(CONTROLLER_GEN_DIR)/$(CONTROLLER_GEN_VERSION)/controller-gen
+ENVTEST = $(ENVTEST_DIR)/$(ENVTEST_VERSION)/setup-envtest
+GOIMPORTS = $(GOIMPORTS_DIR)/$(GOIMPORTS_VERSION)/goimports
+GINKGO = $(GINKGO_DIR)/$(GINKGO_VERSION)/ginkgo
+OPM = $(OPM_DIR)/$(OPM_VERSION)/opm
+OPERATOR_SDK = $(OPERATOR_SDK_DIR)/$(OPERATOR_SDK_VERSION)/operator-sdk
+
+
 .PHONY: kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)
+	$(call go-install-tool,$(KUSTOMIZE),$(KUSTOMIZE_DIR),sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_VERSION))
 
-ENVTEST = $(shell pwd)/bin/setup-envtest
+.PHONY: controller-gen
+controller-gen: ## Download controller-gen locally if necessary.	
+	$(call go-install-tool,$(CONTROLLER_GEN),$(CONTROLLER_GEN_DIR),sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION})
+
 .PHONY: envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
+	$(call go-install-tool,$(ENVTEST),$(ENVTEST_DIR),sigs.k8s.io/controller-runtime/tools/setup-envtest@${ENVTEST_VERSION})
 
-GOIMPORTS = $(shell pwd)/bin/goimports
 .PHONY: goimports
 goimports: ## Download goimports locally if necessary.
-	$(call go-get-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports@v0.1.6)
+	$(call go-install-tool,$(GOIMPORTS),$(GOIMPORTS_DIR),golang.org/x/tools/cmd/goimports@${GOIMPORTS_VERSION})
 
-GINKGO = $(shell pwd)/bin/ginkgo
 .PHONY: ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
-	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/ginkgo@v1.16.4)
+	$(call go-install-tool,$(GINKGO),$(GINKGO_DIR),github.com/onsi/ginkgo/ginkgo@${GINKGO_VERSION})
 
-# go-get-tool will 'go get' any package $2 and install it to $1.
-PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-define go-get-tool
-@[ -f $(1) ] || { \
-set -e ;\
-TMP_DIR=$$(mktemp -d) ;\
-cd $$TMP_DIR ;\
-go mod init tmp ;\
-echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
-rm -rf $$TMP_DIR ;\
+
+# go-install-tool will delete old package $2, then 'go install' any package $3 to $1.
+define go-install-tool
+@[ -f $(1) ]|| { \
+	set -e ;\
+	rm -rf $(2) ;\
+	TMP_DIR=$$(mktemp -d) ;\
+	cd $$TMP_DIR ;\
+	go mod init tmp ;\
+	BIN_DIR=$$(dirname $(1)) ;\
+	mkdir -p $$BIN_DIR ;\
+	echo "Downloading $(3)" ;\
+	GOBIN=$$BIN_DIR GOFLAGS='' go install $(3) ;\
+	rm -rf $$TMP_DIR ;\
 }
 endef
 
@@ -261,30 +303,24 @@ bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
 
 .PHONY: opm
-OPM = ./bin/opm
 opm: ## Download opm locally if necessary.
-ifeq (,$(wildcard $(OPM)))
-	@{ \
-	set -e ;\
-	mkdir -p $(dir $(OPM)) ;\
-	OS=linux && ARCH=amd64 && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.15.1/$${OS}-$${ARCH}-opm ;\
-	chmod +x $(OPM) ;\
-	}
-endif
+	$(call operator-framework-tool, $(OPM), $(OPM_DIR),github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm)
 
 .PHONY: operator-sdk
-OPERATOR_SDK = ./bin/operator-sdk
 operator-sdk: ## Download operator-sdk locally if necessary.
-ifeq (,$(wildcard $(OPERATOR_SDK)))
-	@{ \
+	$(call operator-framework-tool, $(OPERATOR_SDK), $(OPERATOR_SDK_DIR),github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH})
+
+# operator-framework-tool will delete old package $2, then dowmload $3 to $1.
+define operator-framework-tool
+@[ -f $(1) ]|| { \
 	set -e ;\
-	mkdir -p $(dir $(OPERATOR_SDK)) ;\
-	OS=linux && ARCH=amd64 && \
-	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.12.0/operator-sdk_$${OS}_$${ARCH} ;\
-	chmod +x $(OPERATOR_SDK) ;\
+	rm -rf $(2) ;\
+	mkdir -p $(dir $(1)) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSLo $(1) $(3) ;\
+	chmod +x $(1) ;\
 	}
-endif
+endef
 
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
 FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
@@ -326,4 +362,4 @@ container-push:  ## Push containers (NOTE: catalog can't be build before bundle 
 
 .PHONY: cluster-functest 
 cluster-functest: ginkgo ## Run e2e tests in a real cluster
-	./hack/functest.sh
+	./hack/functest.sh $(GINKGO_VERSION)

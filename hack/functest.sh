@@ -17,11 +17,19 @@ if [ -n "${OPENSHIFT_CI}" ]; then
     NO_COLOR="-noColor"
 fi
 
+if [ $# -ne 1 ]
+  then
+    echo "Expecing one variable - ginkgo version"
+    exit 1
+else
+    echo "Running E2e test with ginkgo version $1"
+fi
+
 # -v: print out the text and location for each spec before running it and flush output to stdout in realtime
 # -r: run suites recursively
 # --keepGoing: don't stop on failing suite
 # -requireSuite: fail if tests are not executed because of missing suite
-ACK_GINKGO_DEPRECATIONS=1.16.4 ./bin/ginkgo $NO_COLOR -v -r --keepGoing -requireSuite ./test/e2e
+ACK_GINKGO_DEPRECATIONS=$1 ./bin/ginkgo/$1/ginkgo $NO_COLOR -v -r --keepGoing -requireSuite ./test/e2e
 
 if [[ $? != 0 ]]; then
     echo "E2e tests FAILED"
