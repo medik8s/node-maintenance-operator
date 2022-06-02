@@ -3,17 +3,17 @@
 # See https://github.com/kubernetes-sigs/kustomize for the last version
 KUSTOMIZE_VERSION ?= v4@v4.5.5
 # https://github.com/kubernetes-sigs/controller-tools/releases for the last version
-CONTROLLER_GEN_VERSION ?= v0.6.1
+CONTROLLER_GEN_VERSION ?= v0.8.0
 # See https://pkg.go.dev/sigs.k8s.io/controller-runtime/tools/setup-envtest?tab=versions for the last version
-ENVTEST_VERSION ?= v0.0.0-20220513175748-3f265c36d7bf
+ENVTEST_VERSION ?= v0.0.0-20220525144126-196828e54e42
 # See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
-GOIMPORTS_VERSION ?= v0.1.7
+GOIMPORTS_VERSION ?= v0.1.10
 # See https://github.com/onsi/ginkgo/releases for the last version
 GINKGO_VERSION ?= v1.16.5
 # See github.com/operator-framework/operator-registry/releases for the last version
-OPM_VERSION ?= v1.12.0
+OPM_VERSION ?= v1.23.0
 # See github.com/operator-framework/operator-sdk/releases for the last version
-OPERATOR_SDK_VERSION ?= v1.12.0
+OPERATOR_SDK_VERSION ?= v1.21.0
 # GO_VERSION refers to the version of Golang to be downloaded when running dockerized version
 GO_VERSION = 1.16
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
@@ -272,7 +272,6 @@ goimports: ## Download goimports locally if necessary.
 .PHONY: ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
 	$(call go-install-tool,$(GINKGO),$(GINKGO_DIR),github.com/onsi/ginkgo/ginkgo@${GINKGO_VERSION})
-
 
 # go-install-tool will delete old package $2, then 'go install' any package $3 to $1.
 define go-install-tool
