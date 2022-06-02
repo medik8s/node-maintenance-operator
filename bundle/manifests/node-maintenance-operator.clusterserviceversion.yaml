@@ -206,6 +206,8 @@ spec:
           strategy: {}
           template:
             metadata:
+              annotations:
+                kubectl.kubernetes.io/default-container: manager
               labels:
                 control-plane: controller-manager
                 node-maintenance-operator: ""
@@ -328,7 +330,6 @@ spec:
   webhookdefinitions:
   - admissionReviewVersions:
     - v1
-    - v1beta1
     containerPort: 443
     deploymentName: node-maintenance-operator-controller-manager
     failurePolicy: Fail
