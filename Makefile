@@ -190,7 +190,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 .PHONY: docker-build
-docker-build: test-no-verify ## Build docker image with the manager.
+docker-build: check ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
 .PHONY: docker-push
