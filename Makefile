@@ -337,10 +337,6 @@ catalog-build: opm ## Build a catalog image.
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
-.PHONY: build-push-iib
-build-push-iib: ## Build and push all the three images to quay (docker, bundle, and catalog).
-	docker-build bundle bundle-build container-push 
-
 ##@ Targets used by CI
 
 .PHONY: check 
@@ -354,11 +350,13 @@ verify-unchanged: ## Verify there are no un-committed changes
 .PHONY: container-build 
 container-build: check ## Build containers
 	$(DOCKER_GO) "make bundle"
-	make docker-build bundle-build
+	make docker-build bundle-build must-gather-build
 
 .PHONY: container-push 
-container-push:  ## Push containers (NOTE: catalog can't be build before bundle was pushed)
-	docker-push bundle-push catalog-build catalog-push
+container-push: docker-push bundle-push catalog-build catalog-push must-gather-push ## Push containers (NOTE: catalog can't be build before bundle was pushed)
+
+.PHONY: container-build-and-push
+container-build-and-push: container-build container-push ## Build and push all the four images to quay (docker, bundle, catalog, and must-gather).
 
 .PHONY: cluster-functest 
 cluster-functest: ginkgo ## Run e2e tests in a real cluster
