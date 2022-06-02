@@ -15,9 +15,9 @@ OPM_VERSION ?= v1.23.0
 # See github.com/operator-framework/operator-sdk/releases for the last version
 OPERATOR_SDK_VERSION ?= v1.21.0
 # GO_VERSION refers to the version of Golang to be downloaded when running dockerized version
-GO_VERSION = 1.16
+GO_VERSION = 1.18
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.21
+ENVTEST_K8S_VERSION = 1.23
 
 
 # IMAGE_REGISTRY used to indicate the registery/group for the operator, bundle and catalog

@@ -3,7 +3,7 @@ FROM quay.io/centos/centos:stream9 AS builder
 RUN dnf install git golang -y
 
 # Ensurec orrect Go version
-ENV GO_VERSION=1.16
+ENV GO_VERSION=1.18
 RUN go install golang.org/dl/go${GO_VERSION}@latest
 RUN ~/go/bin/go${GO_VERSION} download
 RUN /bin/cp -f ~/go/bin/go${GO_VERSION} /usr/bin/go
