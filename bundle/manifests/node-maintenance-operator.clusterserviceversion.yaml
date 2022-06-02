@@ -21,7 +21,7 @@ metadata:
     containerImage: ""
     createdAt: ""
     description: Node Maintenance Operator for cordoning and draining nodes.
-    operators.operatorframework.io/builder: operator-sdk-v1.11.0+git
+    operators.operatorframework.io/builder: operator-sdk-v1.21.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/medik8s/node-maintenance-operator
     support: Medik8s
@@ -196,7 +196,10 @@ spec:
           - create
         serviceAccountName: node-maintenance-operator-controller-manager
       deployments:
-      - name: node-maintenance-operator-controller-manager
+      - label:
+          control-plane: controller-manager
+          node-maintenance-operator: ""
+        name: node-maintenance-operator-controller-manager
         spec:
           replicas: 1
           selector:
@@ -206,6 +209,8 @@ spec:
           strategy: {}
           template:
             metadata:
+              annotations:
+                kubectl.kubernetes.io/default-container: manager
               labels:
                 control-plane: controller-manager
                 node-maintenance-operator: ""
@@ -328,7 +333,6 @@ spec:
   webhookdefinitions:
   - admissionReviewVersions:
     - v1
-    - v1beta1
     containerPort: 443
     deploymentName: node-maintenance-operator-controller-manager
     failurePolicy: Fail
