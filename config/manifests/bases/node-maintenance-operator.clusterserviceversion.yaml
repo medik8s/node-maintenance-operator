@@ -32,6 +32,9 @@ spec:
         displayName: Reason
         path: reason
       statusDescriptors:
+      - description: Percentage completion of draining the node
+        displayName: Drain Progress
+        path: drainProgress
       - description: Consecutive number of errors upon obtaining a lease
         displayName: Error On Lease Count
         path: errorOnLeaseCount
@@ -42,6 +45,9 @@ spec:
       - description: LastError represents the latest error if any in the latest reconciliation
         displayName: Last Error
         path: lastError
+      - description: The last time the status has been updated
+        displayName: Last Update
+        path: lastUpdate
       - description: PendingPods is a list of pending pods for eviction
         displayName: Pending Pods
         path: pendingPods

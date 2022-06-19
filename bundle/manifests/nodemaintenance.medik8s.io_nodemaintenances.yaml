@@ -50,6 +50,9 @@ spec:
           status:
             description: NodeMaintenanceStatus defines the observed state of NodeMaintenance
             properties:
+              drainProgress:
+                description: Percentage completion of draining the node
+                type: integer
               errorOnLeaseCount:
                 description: Consecutive number of errors upon obtaining a lease
                 type: integer
@@ -60,6 +63,10 @@ spec:
               lastError:
                 description: LastError represents the latest error if any in the latest
                   reconciliation
+                type: string
+              lastUpdate:
+                description: The last time the status has been updated
+                format: date-time
                 type: string
               pendingPods:
                 description: PendingPods is a list of pending pods for eviction
