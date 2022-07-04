@@ -150,7 +150,6 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	updateOwnedLeaseFailed, err := r.obtainLease(node)
 	if err != nil && updateOwnedLeaseFailed {
-		setLastUpdate(instance)
 		instance.Status.ErrorOnLeaseCount += 1
 		if instance.Status.ErrorOnLeaseCount > MaxAllowedErrorToUpdateOwnedLease {
 			r.logger.Info("can't extend owned lease. uncordon for now")
@@ -165,12 +164,10 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return r.onReconcileError(instance, fmt.Errorf("Failed to extend lease owned by us : %v errorOnLeaseCount %d", err, instance.Status.ErrorOnLeaseCount))
 	}
 	if err != nil {
-		setLastUpdate(instance)
 		instance.Status.ErrorOnLeaseCount = 0
 		return r.onReconcileError(instance, err)
 	} else {
 		if instance.Status.Phase != nodemaintenancev1beta1.MaintenanceRunning || instance.Status.ErrorOnLeaseCount != 0 {
-			setLastUpdate(instance)
 			instance.Status.Phase = nodemaintenancev1beta1.MaintenanceRunning
 			instance.Status.ErrorOnLeaseCount = 0
 		}
@@ -192,13 +189,11 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		r.logger.Info("Not all pods evicted", "nodeName", nodeName, "error", err)
 		waitOnReconcile := WaitDurationOnDrainError
 		return r.onReconcileErrorWithRequeue(instance, err, &waitOnReconcile)
+	} else if instance.Status.Phase != nodemaintenancev1beta1.MaintenanceSucceeded {
+		setLastUpdate(instance)
 	}
 	r.logger.Info("All pods evicted", "nodeName", nodeName)
 
-	// Calculate last update time when the drian is over - there are no more pending pods
-	if instance.Status.PendingPods != nil {
-		setLastUpdate(instance)
-	}
 	instance.Status.Phase = nodemaintenancev1beta1.MaintenanceSucceeded
 	instance.Status.DrainProgress = 100
 	instance.Status.PendingPods = nil
