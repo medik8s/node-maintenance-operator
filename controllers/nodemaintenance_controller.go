@@ -189,10 +189,13 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		r.logger.Info("Not all pods evicted", "nodeName", nodeName, "error", err)
 		waitOnReconcile := WaitDurationOnDrainError
 		return r.onReconcileErrorWithRequeue(instance, err, &waitOnReconcile)
+	} else if instance.Status.Phase != nodemaintenancev1beta1.MaintenanceSucceeded {
+		setLastUpdate(instance)
 	}
 	r.logger.Info("All pods evicted", "nodeName", nodeName)
 
 	instance.Status.Phase = nodemaintenancev1beta1.MaintenanceSucceeded
+	instance.Status.DrainProgress = 100
 	instance.Status.PendingPods = nil
 	err = r.Client.Status().Update(context.TODO(), instance)
 	if err != nil {
@@ -388,6 +391,7 @@ func (r *NodeMaintenanceReconciler) fetchNode(nodeName string) (*corev1.Node, er
 func (r *NodeMaintenanceReconciler) initMaintenanceStatus(nm *nodemaintenancev1beta1.NodeMaintenance) error {
 	if nm.Status.Phase == "" {
 		nm.Status.Phase = nodemaintenancev1beta1.MaintenanceRunning
+		setLastUpdate(nm)
 		pendingList, errlist := r.drainer.GetPodsForDeletion(nm.Spec.NodeName)
 		if errlist != nil {
 			return fmt.Errorf("Failed to get pods for eviction while initializing status")
@@ -414,11 +418,15 @@ func (r *NodeMaintenanceReconciler) initMaintenanceStatus(nm *nodemaintenancev1b
 
 func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(nm *nodemaintenancev1beta1.NodeMaintenance, err error, duration *time.Duration) (reconcile.Result, error) {
 	nm.Status.LastError = err.Error()
+	setLastUpdate(nm)
 
 	if nm.Spec.NodeName != "" {
 		pendingList, _ := r.drainer.GetPodsForDeletion(nm.Spec.NodeName)
 		if pendingList != nil {
 			nm.Status.PendingPods = GetPodNameList(pendingList.Pods())
+			if nm.Status.EvictionPods != 0 {
+				nm.Status.DrainProgress = (nm.Status.EvictionPods - len(nm.Status.PendingPods)) * 100 / nm.Status.EvictionPods
+			}
 		}
 	}
 
@@ -437,6 +445,10 @@ func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(nm *nodemaintena
 func (r *NodeMaintenanceReconciler) onReconcileError(nm *nodemaintenancev1beta1.NodeMaintenance, err error) (reconcile.Result, error) {
 	return r.onReconcileErrorWithRequeue(nm, err, nil)
 
+}
+
+func setLastUpdate(nm *nodemaintenancev1beta1.NodeMaintenance) {
+	nm.Status.LastUpdate.Time = time.Now()
 }
 
 // writer implements io.Writer interface as a pass-through for klog.

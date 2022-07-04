@@ -61,6 +61,12 @@ type NodeMaintenanceStatus struct {
 	// Phase is the represtation of the maintenance progress (Running,Succeeded,Failed)
 	//+operator-sdk:csv:customresourcedefinitions:type=status
 	Phase MaintenancePhase `json:"phase,omitempty"`
+	// Percentage completion of draining the node
+	//+operator-sdk:csv:customresourcedefinitions:type=status
+	DrainProgress int `json:"drainProgress,omitempty"`
+	// The last time the status has been updated
+	//+operator-sdk:csv:customresourcedefinitions:type=status
+	LastUpdate metav1.Time `json:"lastUpdate,omitempty"`
 	// LastError represents the latest error if any in the latest reconciliation
 	//+operator-sdk:csv:customresourcedefinitions:type=status
 	LastError string `json:"lastError,omitempty"`

@@ -31,6 +31,7 @@ var _ = Describe("NodeMaintenance", func() {
 		err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(maintenance.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceSucceeded))
+		Expect(maintenance.Status.DrainProgress).To(Equal(100))
 	}
 
 	checkFailedReconcile := func() {
@@ -117,37 +118,41 @@ var _ = Describe("NodeMaintenance", func() {
 			Expect(len(maintenance.Status.PendingPods)).To(Equal(2))
 			Expect(maintenance.Status.EvictionPods).To(Equal(2))
 			Expect(maintenance.Status.TotalPods).To(Equal(2))
+			Expect(maintenance.Status.DrainProgress).To(Equal(0))
+			Expect(maintenance.Status.LastUpdate.IsZero()).To(BeFalse())
 		})
 
 		It("owner ref should be set properly", func() {
 			r.initMaintenanceStatus(nm)
-			maintanance := &nodemaintenanceapi.NodeMaintenance{}
-			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintanance)
+			maintenance := &nodemaintenanceapi.NodeMaintenance{}
+			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
 			node := &corev1.Node{}
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, node)
 			Expect(err).ToNot(HaveOccurred())
-			r.setOwnerRefToNode(maintanance, node)
-			Expect(len(maintanance.ObjectMeta.GetOwnerReferences())).To(Equal(1))
-			ref := maintanance.ObjectMeta.GetOwnerReferences()[0]
+			r.setOwnerRefToNode(maintenance, node)
+			Expect(len(maintenance.ObjectMeta.GetOwnerReferences())).To(Equal(1))
+			ref := maintenance.ObjectMeta.GetOwnerReferences()[0]
 			Expect(ref.Name).To(Equal(node.ObjectMeta.Name))
 			Expect(ref.UID).To(Equal(node.ObjectMeta.UID))
 			Expect(ref.APIVersion).To(Equal(node.TypeMeta.APIVersion))
 			Expect(ref.Kind).To(Equal(node.TypeMeta.Kind))
-			r.setOwnerRefToNode(maintanance, node)
-			Expect(len(maintanance.ObjectMeta.GetOwnerReferences())).To(Equal(1))
+			r.setOwnerRefToNode(maintenance, node)
+			Expect(len(maintenance.ObjectMeta.GetOwnerReferences())).To(Equal(1))
 		})
 
 		It("Should not init Node maintenance if already set", func() {
 			nmCopy := nm.DeepCopy()
 			nmCopy.Status.Phase = nodemaintenanceapi.MaintenanceRunning
 			r.initMaintenanceStatus(nmCopy)
-			maintanance := &nodemaintenanceapi.NodeMaintenance{}
-			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintanance)
+			maintenance := &nodemaintenanceapi.NodeMaintenance{}
+			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(maintanance.Status.Phase).NotTo(Equal(nodemaintenanceapi.MaintenanceRunning))
-			Expect(len(maintanance.Status.PendingPods)).NotTo(Equal(2))
-			Expect(maintanance.Status.EvictionPods).NotTo(Equal(2))
-			Expect(maintanance.Status.TotalPods).NotTo(Equal(2))
+			Expect(maintenance.Status.Phase).NotTo(Equal(nodemaintenanceapi.MaintenanceRunning))
+			Expect(len(maintenance.Status.PendingPods)).NotTo(Equal(2))
+			Expect(maintenance.Status.EvictionPods).NotTo(Equal(2))
+			Expect(maintenance.Status.TotalPods).NotTo(Equal(2))
+			Expect(maintenance.Status.DrainProgress).To(Equal(0))
+			Expect(maintenance.Status.LastUpdate.IsZero()).To(BeTrue())
 		})
 
 	})
@@ -303,7 +308,7 @@ func getTestObjects() (*nodemaintenanceapi.NodeMaintenance, []client.Object) {
 func getTestNM() *nodemaintenanceapi.NodeMaintenance {
 	return &nodemaintenanceapi.NodeMaintenance{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "node-maintanance",
+			Name: "node-maintenance",
 		},
 		Spec: nodemaintenanceapi.NodeMaintenanceSpec{
 			NodeName: "node01",

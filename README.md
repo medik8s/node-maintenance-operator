@@ -110,9 +110,13 @@ status:
 
 `evictionPods` is the total number of pods up for eviction from the start.
 
+`drainProgress` shows the percentage completion of draining the node.
+
 `lastError` represents the latest error if any for the latest reconciliation.
 
-`pendingPods` PendingPods is a list of pending pods for eviction.
+`lastUpdate` is the last time the status has been updated.
+
+`pendingPods` is a list of pending pods for eviction.
 
 `phase` is the representation of the maintenance progress and can hold a string value of: Running|Succeeded.
 The phase is updated for each processing attempt on the CR.
