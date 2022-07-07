@@ -96,21 +96,21 @@ spec:
   nodeName: node02
   reason: Test node maintenance
 status:
+  drainProgress: 40
   evictionPods: 5
-  lastError: 'Last failure message'
+  lastError: "Last failure message"
+  lastUpdate: "2022-06-23T11:43:18Z"
   pendingPods:
   - pod-A
   - pod-B
   - pod-C
-  - pod-D
-  - pod-E
   phase: Running
   totalpods: 19
 ```
 
-`evictionPods` is the total number of pods up for eviction from the start.
-
 `drainProgress` shows the percentage completion of draining the node.
+
+`evictionPods` is the total number of pods up for eviction, before the node entered maintenance mode.
 
 `lastError` represents the latest error if any for the latest reconciliation.
 
@@ -121,7 +121,7 @@ status:
 `phase` is the representation of the maintenance progress and can hold a string value of: Running|Succeeded.
 The phase is updated for each processing attempt on the CR.
 
-`totalPods` is the total number of all pods on the node from the start.
+`totalPods` is the total number of pods, before the node entered maintenance mode.
 
 ## Debug
 ### Collecting cluster data with must-gather
