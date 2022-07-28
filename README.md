@@ -1,5 +1,9 @@
 # Node Maintenance Operator (NMO)
 
+<p align="center">
+<img width="100" src="config/manifests/nmo_blue_icon.png">
+</p>
+
 The node-maintenance-operator (NMO) is an operator generated from the [operator-sdk](https://github.com/operator-framework/operator-sdk).
 NMO was *previously* develpoed under [KubeVirt](https://github.com/kubevirt/node-maintenance-operator), and this repository is the up to date version of NMO.
 The purpose of this operator is to watch for new or deleted custom resources (CRs) called `NodeMaintenance` which indicate that a node in the cluster should either:
