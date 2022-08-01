@@ -159,3 +159,7 @@ For every major / minor / patch release:
   - this should trigger CI to build and push new images
     - if it fails, the manual fallback is `VERSION=x.y.z make container-build container-push`
   - make the git tag a release in the github UI.
+
+## Help
+
+Feel free to join our google group to get more info - https://groups.google.com/g/medik8s
