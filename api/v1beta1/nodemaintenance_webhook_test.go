@@ -80,7 +80,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 
 		})
 
-		Context("for master node", func() {
+		Context("for master/control-plane node", func() {
 
 			var node *v1.Node
 
@@ -114,7 +114,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 					nm := getTestNMO(existingNodeName)
 					err := nm.ValidateCreate()
 					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring(ErrorMasterQuorumViolation))
+					Expect(err.Error()).To(ContainSubstring(ErrorControlPlaneQuorumViolation))
 				})
 
 			})
@@ -188,15 +188,15 @@ func getTestNMO(nodeName string) *NodeMaintenance {
 	}
 }
 
-func getTestNode(name string, isMaster bool) *v1.Node {
+func getTestNode(name string, isControlPlane bool) *v1.Node {
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
-	if isMaster {
+	if isControlPlane {
 		node.ObjectMeta.Labels = map[string]string{
-			LabelNameRoleMaster: "",
+			LabelNameRoleControlPlane: "",
 		}
 	}
 	return node
