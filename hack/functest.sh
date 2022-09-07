@@ -1,7 +1,7 @@
 #!/bin/bash -ex
 
 echo "Running e2e tests"
-export OPERATOR_NS="default"
+export OPERATOR_NS=${OPERATOR_NS:-default}
 export TEST_NAMESPACE=node-maintenance-test
 
 # no colors in CI
