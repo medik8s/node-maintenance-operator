@@ -3,7 +3,7 @@
 # See https://github.com/kubernetes-sigs/kustomize for the last version
 KUSTOMIZE_VERSION ?= v4@v4.5.5
 # https://github.com/kubernetes-sigs/controller-tools/releases for the last version
-CONTROLLER_GEN_VERSION ?= v0.9.0
+CONTROLLER_GEN_VERSION ?= v0.9.2
 # See https://pkg.go.dev/sigs.k8s.io/controller-runtime/tools/setup-envtest?tab=versions for the last version
 ENVTEST_VERSION ?= v0.0.0-20220525144126-196828e54e42
 # See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
