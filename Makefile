@@ -328,6 +328,10 @@ ifneq ($(origin CATALOG_BASE_IMG), undefined)
 FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
 endif
 
+.PHONY: build-tools
+build-tools: ## Download & build all the tools locally if necessary.
+	$(MAKE) kustomize controller-gen opm envtest operator-sdk ginkgo goimports
+
 # Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
 # This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
 # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator

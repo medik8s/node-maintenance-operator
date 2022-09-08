@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // Package v1beta1 contains API Schema definitions for the nodemaintenance v1beta1 API group
-//+kubebuilder:object:generate=true
-//+groupName=nodemaintenance.medik8s.io
+// +kubebuilder:object:generate=true
+// +groupName=nodemaintenance.medik8s.io
 package v1beta1
 
 import (
