@@ -34,17 +34,18 @@ import (
 )
 
 const (
-	ErrorNodeNotExists           = "invalid nodeName, no node with name %s found"
-	ErrorNodeMaintenanceExists   = "invalid nodeName, a NodeMaintenance for node %s already exists"
-	ErrorNodeNameUpdateForbidden = "updating spec.NodeName isn't allowed"
-	ErrorMasterQuorumViolation   = "can not put master node into maintenance at this moment, it would violate the master quorum"
+	ErrorNodeNotExists               = "invalid nodeName, no node with name %s found"
+	ErrorNodeMaintenanceExists       = "invalid nodeName, a NodeMaintenance for node %s already exists"
+	ErrorNodeNameUpdateForbidden     = "updating spec.NodeName isn't allowed"
+	ErrorControlPlaneQuorumViolation = "can not put master/control-plane node into maintenance at this moment, it would violate the master/control-plane node quorum"
 )
 
 const (
-	EtcdQuorumPDBNewName   = "etcd-guard-pdb"    // The new name of the PDB - From OCP 4.11
-	EtcdQuorumPDBOldName   = "etcd-quorum-guard" // The old name of the PDB - Up to OCP 4.10
-	EtcdQuorumPDBNamespace = "openshift-etcd"
-	LabelNameRoleMaster    = "node-role.kubernetes.io/master"
+	EtcdQuorumPDBNewName      = "etcd-guard-pdb"    // The new name of the PDB - From OCP 4.11
+	EtcdQuorumPDBOldName      = "etcd-quorum-guard" // The old name of the PDB - Up to OCP 4.10
+	EtcdQuorumPDBNamespace    = "openshift-etcd"
+	LabelNameRoleMaster       = "node-role.kubernetes.io/master"
+	LabelNameRoleControlPlane = "node-role.kubernetes.io/control-plane"
 )
 
 const (
@@ -143,8 +144,8 @@ func (v *NodeMaintenanceValidator) ValidateCreate(nm *NodeMaintenance) error {
 		return err
 	}
 
-	// Validate that NodeMaintenance for master nodes don't violate quorum
-	if err := v.validateMasterQuorum(nm.Spec.NodeName); err != nil {
+	// Validate that NodeMaintenance for control-plane nodes don't violate quorum
+	if err := v.validateControlPlaneQuorum(nm.Spec.NodeName); err != nil {
 		nodemaintenancelog.Info("validation failed", "error", err)
 		return err
 	}
@@ -185,19 +186,19 @@ func (v *NodeMaintenanceValidator) validateNoNodeMaintenanceExists(nodeName stri
 	return nil
 }
 
-func (v *NodeMaintenanceValidator) validateMasterQuorum(nodeName string) error {
-	// check if the node is a master node
+func (v *NodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) error {
+	// check if the node is a control-plane node
 	if node, err := getNode(nodeName, v.client); err != nil {
-		return fmt.Errorf("could not get node for master quorum validation, please try again: %v", err)
+		return fmt.Errorf("could not get node for master/control-plane quorum validation, please try again: %v", err)
 	} else if node == nil {
 		// this should have been catched already, but just in case
 		return fmt.Errorf(ErrorNodeNotExists, nodeName)
-	} else if !isMasterNode(node) {
-		// not a master node, nothing to do
+	} else if !isControlPlaneNode(node) {
+		// not a control-plane node, nothing to do
 		return nil
 	}
 
-	// check the etcd-quorum-guard PodDisruptionBudget if we can drain a master node
+	// check the etcd-quorum-guard PodDisruptionBudget if we can drain a control-plane node
 	disruptionsAllowed := int32(-1)
 	for _, pdbName := range []string{EtcdQuorumPDBNewName, EtcdQuorumPDBOldName} {
 		var pdb policyv1.PodDisruptionBudget
@@ -210,18 +211,18 @@ func (v *NodeMaintenanceValidator) validateMasterQuorum(nodeName string) error {
 				// try next one
 				continue
 			}
-			return fmt.Errorf("could not get the etcd quorum guard PDB for master quorum validation, please try again: %v", err)
+			return fmt.Errorf("could not get the etcd quorum guard PDB for master/control-plane quorum validation, please try again: %v", err)
 		}
 		disruptionsAllowed = pdb.Status.DisruptionsAllowed
 		break
 	}
 	if disruptionsAllowed == -1 {
 		// TODO do we need a fallback for k8s clusters?
-		nodemaintenancelog.Info("etcd quorum guard PDB hasn't been found. Skipping master quorum validation.")
+		nodemaintenancelog.Info("etcd quorum guard PDB hasn't been found. Skipping master/control-plane quorum validation.")
 		return nil
 	}
 	if disruptionsAllowed == 0 {
-		return fmt.Errorf(ErrorMasterQuorumViolation)
+		return fmt.Errorf(ErrorControlPlaneQuorumViolation)
 	}
 	return nil
 }
@@ -241,8 +242,11 @@ func getNode(nodeName string, client client.Client) (*v1.Node, error) {
 	return &node, nil
 }
 
-func isMasterNode(node *v1.Node) bool {
+func isControlPlaneNode(node *v1.Node) bool {
 	if _, ok := node.Labels[LabelNameRoleMaster]; ok {
+		return true
+	}
+	if _, ok := node.Labels[LabelNameRoleControlPlane]; ok {
 		return true
 	}
 	return false

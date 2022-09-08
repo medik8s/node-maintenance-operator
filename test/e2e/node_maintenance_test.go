@@ -37,80 +37,80 @@ var _ = Describe("Node Maintenance", func() {
 
 	Describe("Starting maintenance", func() {
 
-		var masters, workers []string
-		var masterMaintenance *nmo.NodeMaintenance
+		var controlPlaneNodes, workers []string
+		var controPlaneMaintenance *nmo.NodeMaintenance
 
 		BeforeEach(func() {
-			if masters == nil {
+			if controlPlaneNodes == nil {
 				// do this once only
-				masters, workers = getNodes()
-				Expect(masters).ToNot(BeEmpty(), "No master nodes found")
+				controlPlaneNodes, workers = getNodes()
+				Expect(controlPlaneNodes).ToNot(BeEmpty(), "No master/control-plane nodes found")
 				Expect(workers).ToNot(BeEmpty(), "No worker nodes found")
 			}
 		})
 
-		Context("for the 1st master node", func() {
+		Context("for the 1st master/control-plane node", func() {
 
 			var err error
 
 			JustBeforeEach(func() {
-				if masterMaintenance == nil {
+				if controPlaneMaintenance == nil {
 					// do this once only
-					master := masters[0]
-					masterMaintenance = getNodeMaintenance(fmt.Sprintf("test-1st-master-%s", master), master)
-					err = createCRIgnoreUnrelatedErrors(masterMaintenance)
+					controlPlaneNode := controlPlaneNodes[0]
+					controPlaneMaintenance = getNodeMaintenance(fmt.Sprintf("test-1st-control-plane-%s", controlPlaneNode), controlPlaneNode)
+					err = createCRIgnoreUnrelatedErrors(controPlaneMaintenance)
 				}
 			})
 
 			It("should succeed", func() {
-				if len(masters) < 3 {
-					Skip("cluster has less than 3 master nodes and is to small for running this test")
+				if len(controlPlaneNodes) < 3 {
+					Skip("cluster has less than 3 master/control-plane nodes and is to small for running this test")
 				}
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("should fail", func() {
-				if len(masters) >= 3 {
-					Skip("with 3 or more masters it should not fail")
+				if len(controlPlaneNodes) >= 3 {
+					Skip("with 3 or more master/control-plane it should not fail")
 				}
-				// we have 1 master only
+				// we have 1 control-plane node only
 				// on Openshift the etcd-quorum-guard PDB should prevent setting maintenance
 				// on k8s the fake etcd-quorum-guard PDB should do as well
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring(nmo.ErrorMasterQuorumViolation), "Unexpected error message")
+				Expect(err.Error()).To(ContainSubstring(nmo.ErrorControlPlaneQuorumViolation), "Unexpected error message")
 			})
 		})
 
-		Context("for the 2nd master node", func() {
+		Context("for the 2nd master/control-plane node", func() {
 
 			AfterEach(func() {
-				// after testing 2nd master we can restore 1st master
-				if masterMaintenance != nil {
-					if err := Client.Delete(context.TODO(), masterMaintenance); err != nil {
-						logWarnf("failed to delete NodeMaintenance for 1st master node: %v\n", err)
+				// after testing 2nd control-plane node we can restore 1st control-plane node
+				if controPlaneMaintenance != nil {
+					if err := Client.Delete(context.TODO(), controPlaneMaintenance); err != nil {
+						logWarnf("failed to delete NodeMaintenance for 1st master/control-plane node: %v\n", err)
 					}
-					masterMaintenance = nil
+					controPlaneMaintenance = nil
 				}
 			})
 
 			It("should fail", func() {
-				if len(masters) < 3 {
-					Skip("cluster has less than 3 master nodes and is too small for running this test")
+				if len(controlPlaneNodes) < 3 {
+					Skip("cluster has less than 3 master/control-plane nodes and is too small for running this test")
 				}
-				if len(masters) > 3 {
-					logWarnf("there are %v master nodes, which is unexpected. Skipping quorum validation for 2nd master node!\n", len(masters))
-					Skip("unexpected big cluster, no clue if 2nd master maintenance is fine or not")
+				if len(controlPlaneNodes) > 3 {
+					logWarnf("there are %v master/control-plane nodes, which is unexpected. Skipping quorum validation for 2nd master/control-plane node!\n", len(controlPlaneNodes))
+					Skip("unexpected big cluster, no clue if 2nd master/control-plane maintenance is fine or not")
 				}
 
-				// the etcd-quorum-guard PDB needs some time to be updated after the 1st master node was set into maintenance
+				// the etcd-quorum-guard PDB needs some time to be updated after the 1st control-plane node was set into maintenance
 				time.Sleep(10 * time.Second)
 
-				master := masters[1]
-				nodeMaintenance := getNodeMaintenance(fmt.Sprintf("test-2nd-master-%s", master), master)
+				controlPlaneNode := controlPlaneNodes[1]
+				nodeMaintenance := getNodeMaintenance(fmt.Sprintf("test-2nd-control-plane-%s", controlPlaneNode), controlPlaneNode)
 
 				err := createCRIgnoreUnrelatedErrors(nodeMaintenance)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring(nmo.ErrorMasterQuorumViolation), "Unexpected error message")
+				Expect(err.Error()).To(ContainSubstring(nmo.ErrorControlPlaneQuorumViolation), "Unexpected error message")
 			})
 		})
 
@@ -260,7 +260,7 @@ var _ = Describe("Node Maintenance", func() {
 })
 
 func getNodes() ([]string, []string) {
-	masters := make([]string, 0)
+	controlPlaneNodes := make([]string, 0)
 	workers := make([]string, 0)
 
 	nodesList := &corev1.NodeList{}
@@ -273,14 +273,16 @@ func getNodes() ([]string, []string) {
 			continue
 		}
 		if _, exists := node.Labels["node-role.kubernetes.io/master"]; exists {
-			masters = append(masters, node.Name)
+			controlPlaneNodes = append(controlPlaneNodes, node.Name)
+		} else if _, exists := node.Labels["node-role.kubernetes.io/control-plane"]; exists {
+			controlPlaneNodes = append(controlPlaneNodes, node.Name)
 		} else {
 			workers = append(workers, node.Name)
 		}
 	}
-	logInfof("master nodes: %v\n", masters)
+	logInfof("master/control-plane nodes: %v\n", controlPlaneNodes)
 	logInfof("worker nodes: %v\n", workers)
-	return masters, workers
+	return controlPlaneNodes, workers
 }
 
 func getNodeMaintenance(name, nodeName string) *nmo.NodeMaintenance {
@@ -302,7 +304,7 @@ func getNodeMaintenance(name, nodeName string) *nmo.NodeMaintenance {
 // Ignore errors like
 // - connect: connection refused
 // - no endpoints available for service "node-maintenance-operator-service"
-// They can be caused by webhooks not being ready yet or unavailable master nodes
+// They can be caused by webhooks not being ready yet or unavailable control-plane nodes
 func createCRIgnoreUnrelatedErrors(nm *nmo.NodeMaintenance) error {
 	var err error
 
@@ -349,6 +351,14 @@ func createTestDeployment() {
 										MatchExpressions: []corev1.NodeSelectorRequirement{
 											{
 												Key:      "node-role.kubernetes.io/master",
+												Operator: corev1.NodeSelectorOpDoesNotExist,
+											},
+										},
+									},
+									{
+										MatchExpressions: []corev1.NodeSelectorRequirement{
+											{
+												Key:      "node-role.kubernetes.io/control-plane",
 												Operator: corev1.NodeSelectorOpDoesNotExist,
 											},
 										},
