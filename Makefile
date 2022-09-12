@@ -1,17 +1,17 @@
 ## Tool Versions
 
 # See https://github.com/kubernetes-sigs/kustomize for the last version
-KUSTOMIZE_VERSION ?= v4@v4.5.5
+KUSTOMIZE_VERSION ?= v4@v4.5.7
 # https://github.com/kubernetes-sigs/controller-tools/releases for the last version
 CONTROLLER_GEN_VERSION ?= v0.9.2
 # See https://pkg.go.dev/sigs.k8s.io/controller-runtime/tools/setup-envtest?tab=versions for the last version
-ENVTEST_VERSION ?= v0.0.0-20220525144126-196828e54e42
+ENVTEST_VERSION ?= v0.0.0-20220907012636-c83076e9f792
 # See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
-GOIMPORTS_VERSION ?= v0.1.10
+GOIMPORTS_VERSION ?= v0.1.12
 # See https://github.com/onsi/ginkgo/releases for the last version
 GINKGO_VERSION ?= v1.16.5
 # See github.com/operator-framework/operator-registry/releases for the last version
-OPM_VERSION ?= v1.23.0
+OPM_VERSION ?= v1.26.1
 # See github.com/operator-framework/operator-sdk/releases for the last version
 OPERATOR_SDK_VERSION ?= v1.23.0
 # GO_VERSION refers to the version of Golang to be downloaded when running dockerized version
@@ -327,6 +327,10 @@ endef
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
 FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
 endif
+
+.PHONY: build-tools
+build-tools: ## Download & build all the tools locally if necessary.
+	$(MAKE) kustomize controller-gen opm envtest operator-sdk ginkgo goimports
 
 # Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
 # This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
