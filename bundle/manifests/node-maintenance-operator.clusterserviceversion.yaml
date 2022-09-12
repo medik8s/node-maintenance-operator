@@ -22,7 +22,7 @@ metadata:
     createdAt: ""
     description: Node Maintenance Operator for cordoning and draining nodes.
     olm.skipRange: '>=0.12.0 <0.13.0'
-    operators.operatorframework.io/builder: operator-sdk-v1.22.0
+    operators.operatorframework.io/builder: operator-sdk-v1.23.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/medik8s/node-maintenance-operator
     support: Medik8s
