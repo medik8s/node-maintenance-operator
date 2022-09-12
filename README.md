@@ -15,9 +15,10 @@ The purpose of this operator is to watch for new or deleted custom resources (CR
 
 ## Build and run the operator
 
-There are two ways to run the operator:
+There are three ways to run the operator:
 
 - Deploy the latest version, which was built from the `main` branch, to a running OpenShift/Kubernetes cluster.
+- Deploy the last release version from OperatorHub to a running Kubernetes cluster.
 - Build and deploy from sources to a running or to be created OpenShift/Kubernetes cluster.
 
 ### Deploy the latest version
@@ -30,6 +31,10 @@ For deployment of NMO using these images you need:
 - a valid `$KUBECONFIG` configured to access your cluster.
 
 Then run `operator-sdk run bundle quay.io/medik8s/node-maintenance-operator-bundle:latest`
+
+### Deploy the last release version
+Click on `Install` in the Node Maintenance Operator page under [OperatorHub.io](https://operatorhub.io/operator/node-maintenance-operator), 
+and follow it's instructions to install the [Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/), and the operator.
 
 ### Build and deploy from sources
 Follow the instructions [here](https://sdk.operatorframework.io/docs/building-operators/golang/tutorial/#3-deploy-your-operator-with-olm) for deploying the operator with OLM.
