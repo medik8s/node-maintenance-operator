@@ -5,7 +5,7 @@
 </p>
 
 The node-maintenance-operator (**NMO**) is an operator generated from the [operator-sdk](https://github.com/operator-framework/operator-sdk).
-NMO was *previously* develpoed under [KubeVirt](https://github.com/kubevirt/node-maintenance-operator), and this repository is the up to date version of NMO.
+NMO was *previously* developed under [KubeVirt](https://github.com/kubevirt/node-maintenance-operator), and this repository is the up-to-date version of NMO.
 
 The purpose of this operator is to watch for new or deleted custom resources (CRs) called `NodeMaintenance` which indicate that a node in the cluster should either:
   - `NodeMaintenance` CR created: move node into maintenance, cordon the node - set it as unschedulable, and evict the pods (which can be evicted) from that node.
@@ -34,7 +34,7 @@ Then run `operator-sdk run bundle quay.io/medik8s/node-maintenance-operator-bund
 
 ### Deploy the last release version
 Click on `Install` in the Node Maintenance Operator page under [OperatorHub.io](https://operatorhub.io/operator/node-maintenance-operator), 
-and follow it's instructions to install the [Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/), and the operator.
+and follow its instructions to install the [Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/), and the operator.
 
 ### Build and deploy from sources
 Follow the instructions [here](https://sdk.operatorframework.io/docs/building-operators/golang/tutorial/#3-deploy-your-operator-with-olm) for deploying the operator with OLM.
@@ -96,7 +96,7 @@ time="2022-02-24T14:27:35Z" level=info msg="Applying medik8s.io/drain taint remo
 
 The `NodeMaintenance` CR can contain the following status fields:
 
-```yaml
+```sh
 $ kubectl get nm nodemaintenance-sample -o yaml
 apiVersion: nodemaintenance.medik8s.io/v1beta1
 kind: NodeMaintenance
@@ -163,8 +163,8 @@ For every major / minor / patch release:
   - create and push the `vx.y.z` tag.
   - this should trigger CI to build and push new images
     - if it fails, the manual fallback is `VERSION=x.y.z make container-build container-push`
-  - make the git tag a release in the github UI.
+  - make the git tag a release in the GitHub UI.
 
 ## Help
 
-Feel free to join our google group to get more info - https://groups.google.com/g/medik8s
+Feel free to join our Google group to get more info - https://groups.google.com/g/medik8s
