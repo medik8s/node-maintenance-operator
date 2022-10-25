@@ -3,21 +3,21 @@
 # See https://github.com/kubernetes-sigs/kustomize for the last version
 KUSTOMIZE_VERSION ?= v4@v4.5.7
 # https://github.com/kubernetes-sigs/controller-tools/releases for the last version
-CONTROLLER_GEN_VERSION ?= v0.9.2
+CONTROLLER_GEN_VERSION ?= v0.10.0
 # See https://pkg.go.dev/sigs.k8s.io/controller-runtime/tools/setup-envtest?tab=versions for the last version
-ENVTEST_VERSION ?= v0.0.0-20220907012636-c83076e9f792
+ENVTEST_VERSION ?= v0.0.0-20221022092956-090611b34874
 # See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
-GOIMPORTS_VERSION ?= v0.1.12
+GOIMPORTS_VERSION ?= v0.2.0
 # See https://github.com/onsi/ginkgo/releases for the last version
 GINKGO_VERSION ?= v1.16.5
 # See github.com/operator-framework/operator-registry/releases for the last version
-OPM_VERSION ?= v1.26.1
+OPM_VERSION ?= v1.26.2
 # See github.com/operator-framework/operator-sdk/releases for the last version
-OPERATOR_SDK_VERSION ?= v1.23.0
+OPERATOR_SDK_VERSION ?= v1.25.0
 # GO_VERSION refers to the version of Golang to be downloaded when running dockerized version
 GO_VERSION = 1.19
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.24
+ENVTEST_K8S_VERSION = 1.25
 
 
 # IMAGE_REGISTRY used to indicate the registery/group for the operator, bundle and catalog
