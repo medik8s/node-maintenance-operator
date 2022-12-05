@@ -272,6 +272,9 @@ spec:
                     memory: 20Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
               priorityClassName: system-cluster-critical
               securityContext:
                 runAsNonRoot: true
