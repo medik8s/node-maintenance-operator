@@ -296,6 +296,11 @@ bundle: manifests operator-sdk kustomize ## Generate bundle manifests and metada
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
+.PHONY: bundle-k8s
+bundle-k8s: bundle # Generate bundle manifests and metadata for Kubernetes, then validate generated files.
+	$(KUSTOMIZE) build config/manifests-k8s | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
+	$(OPERATOR_SDK) bundle validate ./bundle
+
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
