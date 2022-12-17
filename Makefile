@@ -13,7 +13,7 @@ GINKGO_VERSION ?= v1.16.5
 # See github.com/operator-framework/operator-registry/releases for the last version
 OPM_VERSION ?= v1.26.2
 # See github.com/operator-framework/operator-sdk/releases for the last version
-OPERATOR_SDK_VERSION ?= v1.25.0
+OPERATOR_SDK_VERSION ?= v1.26.0
 # GO_VERSION refers to the version of Golang to be downloaded when running dockerized version
 GO_VERSION = 1.19
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
