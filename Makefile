@@ -227,6 +227,10 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
+.PHONY: scorecard-tests
+scorecard-tests: envtest # Run Scorecard tests with $ENVTEST_K8S_VERSION Kubernetes version
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(OPERATOR_SDK) scorecard ./bundle
+
 ##@ Build Dependencies
 
 ## Location to install dependencies to
@@ -295,11 +299,13 @@ bundle: manifests operator-sdk kustomize ## Generate bundle manifests and metada
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle
+	$(MAKE) scorecard-tests
 
 .PHONY: bundle-k8s
 bundle-k8s: bundle # Generate bundle manifests and metadata for Kubernetes, then validate generated files.
 	$(KUSTOMIZE) build config/manifests-k8s | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle
+	$(MAKE) scorecard-tests
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
