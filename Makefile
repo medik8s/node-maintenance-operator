@@ -191,6 +191,10 @@ bundle-update: ## Update containerImage, createdAt, and icon fields in the bundl
 	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 	$(OPERATOR_SDK) bundle validate ./bundle
 
+.PHONY: bundle-reset-date
+bundle-reset-date: ## Reset bundle's createdAt
+	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+
 .PHONY: bundle-reset
 bundle-reset: ## Reset all version or build date related changes
 	VERSION=0.0.1 $(MAKE) bundle
@@ -310,6 +314,7 @@ bundle: manifests operator-sdk kustomize ## Generate bundle manifests and metada
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
+	$(MAKE) bundle-reset-date
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-k8s
