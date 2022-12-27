@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
+export IMAGE=$( oc status | grep '^pod')
 
 function version() {
-  # Use OS_GIT_VERSION to get the version during build (major.minor.micro-patch_version, e.g. v4.11.0-1)
-  # https://github.com/openshift/must-gather/pull/327/files#r1036400571
-  version=$OS_GIT_VERSION
 
-# if OS_GIT_VERSION is not found, then get version from image (major.minor.micro, e.g. v4.11.0)
- [ -z "${version}" ] && version=v$( oc status | grep '^pod' | \
-    sed -n -r -e 's/.*(([[:digit:]])+\.([[:digit:]])+\.([[:digit:]])+).*/\1/p' \
-  )
+  # get version from image (major.minor.micro, e.g. v4.11.0)
+  version=v$(sed -n -r -e 's/.*(([[:digit:]])+\.([[:digit:]])+\.([[:digit:]])+).*/\1/p' <<< $IMAGE)
 
   # if version is still not found, use 0.0.0-unknown
   [ -z "${version}" ] && version="0.0.0-unknown"
@@ -16,13 +12,13 @@ function version() {
   echo ${version}
 }
 
-function image_id() {
-   # get image id (e.g. repository@digest )
-  image_id=$(oc status | grep '^pod' | sed -r -e 's/^pod.*runs //' | awk '{print $2}')
+function imageId() {
+  # get image id (e.g. repository@digest )
+  imageId=$(sed -r -e 's/^pod.*runs //' <<< $IMAGE | awk '{print $2}')
   
   # if image_id is not found, use Unknown
-  [ -z "${image_id}" ] && image_id="Unknown-Image"
+  [ -z "${imageId}" ] && imageId="Unknown-Image"
   
-echo ${image_id}
+echo ${imageId}
 
 }

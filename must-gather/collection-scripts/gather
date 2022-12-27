@@ -8,7 +8,7 @@ DIR_NAME=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 . ${DIR_NAME}/version
 echo "medik8s/node-maintenance-operator" > /must-gather/version # imageName - Source repo identifier
 version >> /must-gather/version # imageVersion  - Build version
-image_id >> /must-gather/version # imageID  -  repository@digest          
+imageId >> /must-gather/version # imageID  -  repository@digest          
 OPERATOR_NAME="node-maintenance"
 
 # Init named resource list, eg. ns/openshift-config
