@@ -195,10 +195,6 @@ bundle-update: ## Update containerImage, createdAt, and icon fields in the bundl
 bundle-reset-date: ## Reset bundle's createdAt
 	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 
-.PHONY: bundle-reset
-bundle-reset: ## Reset all version or build date related changes
-	VERSION=0.0.1 $(MAKE) bundle
-
 ##@ Build
 
 .PHONY: build
@@ -376,7 +372,7 @@ check: ## Dockerized version of make test-no-verify
 	$(DOCKER_GO) "make test-no-verify"
 
 .PHONY: verify-unchanged
-verify-unchanged: bundle-reset ## Verify there are no un-committed changes
+verify-unchanged: ## Verify there are no un-committed changes
 	./hack/verify-unchanged.sh
 
 .PHONY: container-build 
