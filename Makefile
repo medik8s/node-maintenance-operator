@@ -179,6 +179,22 @@ test: test-no-verify verify-unchanged ## Generate and format code, run tests, ge
 test-no-verify: manifests generate go-verify fmt vet envtest ginkgo ## Generate and format code, and run tests
 	ACK_GINKGO_DEPRECATIONS=$(GINKGO_VERSION) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -v -r --keepGoing -requireSuite ./api/... ./controllers/... -coverprofile cover.out
 
+##@ Bundle Creation Addition
+## Some addition to bundle creation in the bundle
+DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ./config/assets/nmo_blue_icon.png)
+export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
+
+.PHONY: bundle-update
+bundle-update: ## Update containerImage, createdAt, and icon fields in the bundle's CSV
+	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+	$(OPERATOR_SDK) bundle validate ./bundle
+
+.PHONY: bundle-reset
+bundle-reset: ## Reset all version or build date related changes
+	VERSION=0.0.1 $(MAKE) bundle
+
 ##@ Build
 
 .PHONY: build
@@ -302,7 +318,7 @@ bundle-k8s: bundle # Generate bundle manifests and metadata for Kubernetes, then
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build
-bundle-build: ## Build the bundle image.
+bundle-build: bundle-update ## Build the bundle image.
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
@@ -355,7 +371,7 @@ check: ## Dockerized version of make test-no-verify
 	$(DOCKER_GO) "make test-no-verify"
 
 .PHONY: verify-unchanged
-verify-unchanged: ## Verify there are no un-committed changes
+verify-unchanged: bundle-reset ## Verify there are no un-committed changes
 	./hack/verify-unchanged.sh
 
 .PHONY: container-build 
