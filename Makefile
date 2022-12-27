@@ -176,8 +176,9 @@ go-verify: go-tidy go-vendor # Run go mod verify - verify dependencies have expe
 test: test-no-verify verify-unchanged ## Generate and format code, run tests, generate manifests and bundle, and verify no uncommitted changes
 
 .PHONY: test-no-verify
-test-no-verify: manifests generate go-verify fmt vet envtest ginkgo ## Generate and format code, and run tests
+test-no-verify: manifests generate go-verify fmt vet envtest ginkgo ## Generate and format code, and run tests (unit tests, and Scorecard tests the bundle directory
 	ACK_GINKGO_DEPRECATIONS=$(GINKGO_VERSION) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -v -r --keepGoing -requireSuite ./api/... ./controllers/... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(OPERATOR_SDK) scorecard ./bundle
 
 ##@ Build
 
@@ -226,10 +227,6 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
-
-.PHONY: scorecard-tests
-scorecard-tests: envtest # Run Scorecard tests with $ENVTEST_K8S_VERSION Kubernetes version
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(OPERATOR_SDK) scorecard ./bundle
 
 ##@ Build Dependencies
 
@@ -299,13 +296,11 @@ bundle: manifests operator-sdk kustomize ## Generate bundle manifests and metada
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle
-	$(MAKE) scorecard-tests
 
 .PHONY: bundle-k8s
 bundle-k8s: bundle # Generate bundle manifests and metadata for Kubernetes, then validate generated files.
 	$(KUSTOMIZE) build config/manifests-k8s | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle
-	$(MAKE) scorecard-tests
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
