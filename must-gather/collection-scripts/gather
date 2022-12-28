@@ -6,9 +6,9 @@ mkdir -p must-gather/operator-pod-logs/
 # Generate /must-gather/version file
 DIR_NAME=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 . ${DIR_NAME}/version
-echo "node-maintenance-operator/must-gather" > /must-gather/version
-version >> /must-gather/version
-
+echo "medik8s/node-maintenance-operator" > /must-gather/version # imageName - Source repo identifier
+version >> /must-gather/version # imageVersion  - Build version
+imageId >> /must-gather/version # imageID  -  repository@digest          
 OPERATOR_NAME="node-maintenance"
 
 # Init named resource list, eg. ns/openshift-config

@@ -8,7 +8,7 @@ COPY --from=builder /usr/bin/oc /usr/bin/oc
 
 # Save original gather script
 COPY --from=builder /usr/bin/gather /usr/bin/gather_original
-COPY --from=builder /usr/bin/version /usr/bin/version
+COPY --from=builder /usr/bin/version /usr/bin/version_original
 
 # Copy our scripts
 COPY collection-scripts/* /usr/bin/
