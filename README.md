@@ -1,7 +1,7 @@
 # Node Maintenance Operator (NMO)
 
 <p align="center">
-<img width="100" src="config/manifests/nmo_blue_icon.png">
+<img width="100" src="config/assests/nmo_blue_icon.png">
 </p>
 
 The node-maintenance-operator (**NMO**) is an operator generated from the [operator-sdk](https://github.com/operator-framework/operator-sdk).
