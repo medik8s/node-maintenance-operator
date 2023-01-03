@@ -5,11 +5,13 @@ filters:
       - slintes
       - razo7
       - mshitrit
+      - clobrano
     approvers:
       - beekhof
       - slintes
-      - razo7   
+      - razo7
       - mshitrit
+      - clobrano
 
     # Specify only if your Bugzilla product is not OCP
     product: "Kubernetes-native Infrastructure"
