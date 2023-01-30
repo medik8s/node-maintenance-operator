@@ -311,12 +311,16 @@ bundle: manifests operator-sdk kustomize ## Generate bundle manifests and metada
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(MAKE) bundle-reset-date
-	$(OPERATOR_SDK) bundle validate ./bundle
+	## Validate the bundle directory with addinonal validtors, such as Kubernetes deprecated APIs based on bundle.CSV.Spec.MinKubeVersion
+	##  https://kubernetes.io/docs/reference/using-api/deprecation-guide/
+	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
 
 .PHONY: bundle-k8s
 bundle-k8s: bundle # Generate bundle manifests and metadata for Kubernetes, then validate generated files.
 	$(KUSTOMIZE) build config/manifests-k8s | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
-	$(OPERATOR_SDK) bundle validate ./bundle
+	## Validate the bundle directory with addinonal validtors, such as Kubernetes deprecated APIs based on bundle.CSV.Spec.MinKubeVersion
+	##  https://kubernetes.io/docs/reference/using-api/deprecation-guide/
+	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
 
 .PHONY: bundle-build
 bundle-build: bundle-update ## Build the bundle image.
