@@ -54,7 +54,7 @@ var _ = BeforeSuite(func() {
 
 	// call start or refactor when moving to "normal" testEnv test
 
-}, 60)
+})
 
 func startTestEnv() {
 	By("bootstrapping test environment")
