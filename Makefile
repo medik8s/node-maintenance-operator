@@ -9,7 +9,7 @@ ENVTEST_VERSION ?= v0.0.0-20221022092956-090611b34874
 # See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
 GOIMPORTS_VERSION ?= v0.2.0
 # See https://github.com/onsi/ginkgo/releases for the last version
-GINKGO_VERSION ?= v1.16.5
+GINKGO_VERSION ?= v2.8.0
 # See github.com/operator-framework/operator-registry/releases for the last version
 OPM_VERSION ?= v1.26.2
 # See github.com/operator-framework/operator-sdk/releases for the last version
@@ -287,7 +287,7 @@ goimports: ## Download goimports locally if necessary.
 
 .PHONY: ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
-	$(call go-install-tool,$(GINKGO),$(GINKGO_DIR),github.com/onsi/ginkgo/ginkgo@${GINKGO_VERSION})
+	$(call go-install-tool,$(GINKGO),$(GINKGO_DIR),github.com/onsi/ginkgo/v2/ginkgo@${GINKGO_VERSION})
 
 # go-install-tool will delete old package $2, then 'go install' any package $3 to $1.
 define go-install-tool
