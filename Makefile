@@ -177,7 +177,7 @@ test: test-no-verify verify-unchanged ## Generate and format code, run tests, ge
 
 .PHONY: test-no-verify
 test-no-verify: manifests generate go-verify fmt vet envtest ginkgo ## Generate and format code, and run tests
-	ACK_GINKGO_DEPRECATIONS=$(GINKGO_VERSION) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -v -r --keepGoing -requireSuite ./api/... ./controllers/... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -r --keep-going  --require-suite --vv ./api/... ./controllers/... --coverprofile cover.out
 
 ##@ Bundle Creation Addition
 ## Some addition to bundle creation in the bundle
