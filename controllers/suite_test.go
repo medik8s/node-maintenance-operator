@@ -46,7 +46,7 @@ var ctxFromSignalHandler context.Context
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
-
+	RunSpecs(t, "Controllers Suite")
 }
 
 var _ = BeforeSuite(func() {
