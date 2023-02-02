@@ -9,7 +9,7 @@ ENVTEST_VERSION ?= v0.0.0-20221022092956-090611b34874
 # See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
 GOIMPORTS_VERSION ?= v0.2.0
 # See https://github.com/onsi/ginkgo/releases for the last version
-GINKGO_VERSION ?= v1.16.5
+GINKGO_VERSION ?= v2.8.0
 # See github.com/operator-framework/operator-registry/releases for the last version
 OPM_VERSION ?= v1.26.2
 # See github.com/operator-framework/operator-sdk/releases for the last version
@@ -177,7 +177,7 @@ test: test-no-verify verify-unchanged ## Generate and format code, run tests, ge
 
 .PHONY: test-no-verify
 test-no-verify: manifests generate go-verify fmt vet envtest ginkgo ## Generate and format code, and run tests
-	ACK_GINKGO_DEPRECATIONS=$(GINKGO_VERSION) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -v -r --keepGoing -requireSuite ./api/... ./controllers/... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -r --keep-going  --require-suite --vv ./api/... ./controllers/... --coverprofile cover.out
 
 ##@ Bundle Creation Addition
 ## Some addition to bundle creation in the bundle
@@ -287,7 +287,7 @@ goimports: ## Download goimports locally if necessary.
 
 .PHONY: ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
-	$(call go-install-tool,$(GINKGO),$(GINKGO_DIR),github.com/onsi/ginkgo/ginkgo@${GINKGO_VERSION})
+	$(call go-install-tool,$(GINKGO),$(GINKGO_DIR),github.com/onsi/ginkgo/v2/ginkgo@${GINKGO_VERSION})
 
 # go-install-tool will delete old package $2, then 'go install' any package $3 to $1.
 define go-install-tool

@@ -14,7 +14,7 @@ fi
 
 # never colors in OpenshiftCI?
 if [ -n "${OPENSHIFT_CI}" ]; then
-    NO_COLOR="-noColor"
+    NO_COLOR="--no-color"
 fi
 
 if [ $# -ne 1 ]
@@ -25,11 +25,12 @@ else
     echo "Running E2e test with ginkgo version $1"
 fi
 
-# -v: print out the text and location for each spec before running it and flush output to stdout in realtime
-# -r: run suites recursively
-# --keepGoing: don't stop on failing suite
-# -requireSuite: fail if tests are not executed because of missing suite
-ACK_GINKGO_DEPRECATIONS=$1 ./bin/ginkgo/$1/ginkgo $NO_COLOR -v -r --keepGoing -requireSuite ./test/e2e
+# -r: If set, ginkgo finds and runs test suites under the current directory recursively.
+# --keep-going:  If set, failures from earlier test suites do not prevent later test suites from running.
+# --require-suite: If set, Ginkgo fails if there are ginkgo tests in a directory but no invocation of RunSpecs.
+# --no-color: If set, suppress color output in default reporter.
+# --vv: If set, emits with maximal verbosity - includes skipped and pending tests.
+./bin/ginkgo/$1/ginkgo -r --keep-going --require-suite $NO_COLOR --vv  ./test/e2e
 
 if [[ $? != 0 ]]; then
     echo "E2e tests FAILED"

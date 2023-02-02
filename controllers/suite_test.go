@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/client-go/kubernetes/scheme"
@@ -46,7 +46,7 @@ var ctxFromSignalHandler context.Context
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
-
+	RunSpecs(t, "Controllers Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -54,7 +54,7 @@ var _ = BeforeSuite(func() {
 
 	// call start or refactor when moving to "normal" testEnv test
 
-}, 60)
+})
 
 func startTestEnv() {
 	By("bootstrapping test environment")

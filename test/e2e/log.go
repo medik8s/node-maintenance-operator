@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // Provide some wrapper funcs for formatted logging using the GinkgoWriter.
