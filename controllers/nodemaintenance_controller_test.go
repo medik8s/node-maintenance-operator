@@ -19,7 +19,7 @@ import (
 	nodemaintenanceapi "github.com/medik8s/node-maintenance-operator/api/v1beta1"
 )
 
-var _ = Describe("NodeMaintenance", func() {
+var _ = Describe("Node Maintenance", func() {
 
 	var r *NodeMaintenanceReconciler
 	var nm *nodemaintenanceapi.NodeMaintenance
@@ -107,7 +107,7 @@ var _ = Describe("NodeMaintenance", func() {
 		stopTestEnv()
 	})
 
-	Context("Node maintenance controller initialization test", func() {
+	Context("Initialization test", func() {
 
 		It("Node maintenance should be initialized properly", func() {
 			r.initMaintenanceStatus(nm)
@@ -157,7 +157,7 @@ var _ = Describe("NodeMaintenance", func() {
 
 	})
 
-	Context("Node maintenance controller taint function test", func() {
+	Context("Taint functioninality test", func() {
 		It("should add medik8s NoSchedule taint and keep other existing taints", func() {
 			node := &corev1.Node{}
 			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, node)
@@ -195,7 +195,7 @@ var _ = Describe("NodeMaintenance", func() {
 		})
 	})
 
-	Context("Node maintenance controller reconciles a maintenance CR for a node in the cluster", func() {
+	Context("Reconciliation", func() {
 
 		It("should reconcile once without failing", func() {
 			reconcileMaintenance(nm)
