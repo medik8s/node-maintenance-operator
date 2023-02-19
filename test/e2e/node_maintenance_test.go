@@ -33,9 +33,7 @@ var (
 	podLabel        = map[string]string{"test": "drain"}
 )
 
-var _ = Describe("Node Maintenance", func() {
-
-	Describe("Starting maintenance", func() {
+var _ = Describe("Starting Maintenance", func() {
 
 		var controlPlaneNodes, workers []string
 		var controPlaneMaintenance *nmo.NodeMaintenance
@@ -255,8 +253,6 @@ var _ = Describe("Node Maintenance", func() {
 			})
 
 		})
-	})
-
 })
 
 func getNodes() ([]string, []string) {
