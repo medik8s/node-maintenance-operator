@@ -195,6 +195,11 @@ bundle-update: ## Update containerImage, createdAt, and icon fields in the bundl
 bundle-reset-date: ## Reset bundle's createdAt
 	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 
+.PHONY: bundle-community
+bundle-community: bundle-k8s ## Update displayName, and description fields in the bundle's CSV
+	sed -r -i "s|displayName: Node Maintenance Operator|displayName: Node Maintenance Operator - Community Edition |;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+	$(MAKE) bundle-update
+
 ##@ Build
 
 .PHONY: build
