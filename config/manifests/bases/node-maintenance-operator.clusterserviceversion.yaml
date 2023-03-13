@@ -65,9 +65,6 @@ spec:
 
     This operator will keep nodes cordoned and drained while a matching NodeMaintenance (nm) custom resource exists.
     This is useful when investigating problems with a machine, or performing an operation on the underlying machine that might result in node failure.
-
-    This is a standalone version of NMO. In case OpenShift Virtualization v4.10.z or less is installed in your cluster, then it has an old NMO.
-    Please update OpenShift Virtualization version, and use this newer NMO.
   displayName: Node Maintenance Operator
   icon:
   - base64data: ""
