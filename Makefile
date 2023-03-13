@@ -18,7 +18,8 @@ OPERATOR_SDK_VERSION ?= v1.26.0
 GO_VERSION = 1.19
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.25
-
+# See https://github.com/slintes/sort-imports/releases for the last version
+SORT_IMPORTS_VERSION = v0.2.1
 
 # IMAGE_REGISTRY used to indicate the registery/group for the operator, bundle and catalog
 IMAGE_REGISTRY ?= quay.io/medik8s
@@ -172,11 +173,19 @@ go-vendor:  # Run go mod vendor - make vendored copy of dependencies.
 go-verify: go-tidy go-vendor # Run go mod verify - verify dependencies have expected content
 	go mod verify
 
+.PHONY: test-imports
+test-imports: sort-imports ## Check for sorted imports
+	$(SORT_IMPORTS) .
+
+.PHONY: fix-imports
+fix-imports: sort-imports ## Sort imports
+	$(SORT_IMPORTS) -w .
+
 .PHONY: test
 test: test-no-verify verify-unchanged ## Generate and format code, run tests, generate manifests and bundle, and verify no uncommitted changes
 
 .PHONY: test-no-verify
-test-no-verify: manifests generate go-verify fmt vet envtest ginkgo ## Generate and format code, and run tests
+test-no-verify: manifests generate go-verify test-imports fmt vet envtest ginkgo ## Generate and format code, and run tests
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -r --keep-going  --require-suite --vv ./api/... ./controllers/... --coverprofile cover.out
 
 ##@ Bundle Creation Addition
@@ -263,6 +272,7 @@ GOIMPORTS_DIR ?= $(LOCALBIN)/goimports
 GINKGO_DIR ?= $(LOCALBIN)/ginkgo
 OPM_DIR = $(LOCALBIN)/opm
 OPERATOR_SDK_DIR ?= $(LOCALBIN)/operator-sdk
+SORT_IMPORTS_DIR ?= $(LOCALBIN)/sort-imports
 
 ## Specific Tool Binaries
 KUSTOMIZE = $(KUSTOMIZE_DIR)/$(KUSTOMIZE_VERSION)/kustomize
@@ -272,7 +282,7 @@ GOIMPORTS = $(GOIMPORTS_DIR)/$(GOIMPORTS_VERSION)/goimports
 GINKGO = $(GINKGO_DIR)/$(GINKGO_VERSION)/ginkgo
 OPM = $(OPM_DIR)/$(OPM_VERSION)/opm
 OPERATOR_SDK = $(OPERATOR_SDK_DIR)/$(OPERATOR_SDK_VERSION)/operator-sdk
-
+SORT_IMPORTS = $(SORT_IMPORTS_DIR)/$(SORT_IMPORTS_VERSION)/sort-imports
 
 .PHONY: kustomize
 kustomize: ## Download kustomize locally if necessary.
@@ -293,6 +303,10 @@ goimports: ## Download goimports locally if necessary.
 .PHONY: ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
 	$(call go-install-tool,$(GINKGO),$(GINKGO_DIR),github.com/onsi/ginkgo/v2/ginkgo@${GINKGO_VERSION})
+
+.PHONY: sort-imports
+sort-imports: ## Download sort-imports locally if necessary.
+	$(call go-install-tool,$(SORT_IMPORTS),$(SORT_IMPORTS_DIR),github.com/slintes/sort-imports@$(SORT_IMPORTS_VERSION))
 
 # go-install-tool will delete old package $2, then 'go install' any package $3 to $1.
 define go-install-tool
