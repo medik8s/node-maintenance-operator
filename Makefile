@@ -1,23 +1,23 @@
 ## Tool Versions
 
 # See https://github.com/kubernetes-sigs/kustomize for the last version
-KUSTOMIZE_VERSION ?= v4@v4.5.7
+KUSTOMIZE_VERSION ?= v5@v5.0.0
 # https://github.com/kubernetes-sigs/controller-tools/releases for the last version
-CONTROLLER_GEN_VERSION ?= v0.10.0
+CONTROLLER_GEN_VERSION ?= v0.11.3
 # See https://pkg.go.dev/sigs.k8s.io/controller-runtime/tools/setup-envtest?tab=versions for the last version
-ENVTEST_VERSION ?= v0.0.0-20221022092956-090611b34874
+ENVTEST_VERSION ?= v0.0.0-20230307042619-c304e7ec2ee7
 # See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
-GOIMPORTS_VERSION ?= v0.2.0
+GOIMPORTS_VERSION ?= v0.7.0
 # See https://github.com/onsi/ginkgo/releases for the last version
-GINKGO_VERSION ?= v2.8.0
+GINKGO_VERSION ?= v2.9.1
 # See github.com/operator-framework/operator-registry/releases for the last version
-OPM_VERSION ?= v1.26.2
+OPM_VERSION ?= v1.26.4
 # See github.com/operator-framework/operator-sdk/releases for the last version
 OPERATOR_SDK_VERSION ?= v1.26.0
 # GO_VERSION refers to the version of Golang to be downloaded when running dockerized version
-GO_VERSION = 1.19
+GO_VERSION = 1.20
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.25
+ENVTEST_K8S_VERSION = 1.26
 # See https://github.com/slintes/sort-imports/releases for the last version
 SORT_IMPORTS_VERSION = v0.2.1
 
@@ -350,14 +350,14 @@ bundle-push: ## Push the bundle image.
 
 .PHONY: opm
 opm: ## Download opm locally if necessary.
-	$(call operator-framework-tool, $(OPM), $(OPM_DIR),github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm)
+	$(call url-install-tool, $(OPM), $(OPM_DIR),github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm)
 
 .PHONY: operator-sdk
 operator-sdk: ## Download operator-sdk locally if necessary.
-	$(call operator-framework-tool, $(OPERATOR_SDK), $(OPERATOR_SDK_DIR),github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH})
+	$(call url-install-tool, $(OPERATOR_SDK), $(OPERATOR_SDK_DIR),github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH})
 
-# operator-framework-tool will delete old package $2, then dowmload $3 to $1.
-define operator-framework-tool
+# url-install-tool will delete old package $2, then download $3 to $1.
+define url-install-tool
 @[ -f $(1) ]|| { \
 	set -e ;\
 	rm -rf $(2) ;\
