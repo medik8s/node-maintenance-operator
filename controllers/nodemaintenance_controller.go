@@ -48,24 +48,24 @@ const (
 	WaitDurationOnDrainError          = 5 * time.Second
 	FixedDurationReconcileLog         = "Reconciling with fixed duration"
 
-	LeaseNamespaceDefault = "node-maintenance"
+	//lease params
+	leaseNamespaceDefault = "node-maintenance"
 	LeaseHolderIdentity   = "node-maintenance"
 	LeaseDuration         = 3600 * time.Second
 	DrainerTimeout        = 30 * time.Second
 )
 
 var (
-	LeaseNamespace = LeaseNamespaceDefault
+	LeaseNamespace = leaseNamespaceDefault
 )
 
 // NodeMaintenanceReconciler reconciles a NodeMaintenance object
 type NodeMaintenanceReconciler struct {
 	client.Client
-	Scheme           *runtime.Scheme
-	LeaseManager     lease.Manager
-	drainer          *drain.Helper
-	isLeaseSupported bool
-	logger           logr.Logger
+	Scheme       *runtime.Scheme
+	LeaseManager lease.Manager
+	drainer      *drain.Helper
+	logger       logr.Logger
 }
 
 //+kubebuilder:rbac:groups=nodemaintenance.medik8s.io,resources=nodemaintenances,verbs=get;list;watch;create;update;patch;delete
@@ -220,14 +220,10 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeMaintenanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	err := initDrainer(r, mgr.GetConfig())
-	if err != nil {
+	if err := initDrainer(r, mgr.GetConfig()); err != nil {
 		return err
 	}
-	err = r.checkLeaseSupported()
-	if err != nil {
-		return err
-	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&nodemaintenancev1beta1.NodeMaintenance{}).
 		Complete(r)
@@ -292,16 +288,6 @@ func initDrainer(r *NodeMaintenanceReconciler, config *rest.Config) error {
 	return nil
 }
 
-func (r *NodeMaintenanceReconciler) checkLeaseSupported() error {
-	isLeaseSupported, err := checkLeaseSupportedInternal(r.drainer.Client)
-	if err != nil {
-		r.logger.Error(err, "Failed to check for lease support")
-		return err
-	}
-	r.isLeaseSupported = isLeaseSupported
-	return nil
-}
-
 func (r *NodeMaintenanceReconciler) setOwnerRefToNode(instance *nodemaintenancev1beta1.NodeMaintenance, node *corev1.Node) {
 
 	for _, ref := range instance.ObjectMeta.GetOwnerReferences() {
@@ -326,11 +312,6 @@ func (r *NodeMaintenanceReconciler) setOwnerRefToNode(instance *nodemaintenancev
 }
 
 func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error) {
-
-	if !r.isLeaseSupported {
-		return false, nil
-	}
-
 	r.logger.Info("Lease object supported, obtaining lease")
 	lease, needUpdate, err := r.LeaseManager.CreateOrGetLease(context.Background(), node, LeaseDuration, LeaseHolderIdentity, LeaseNamespace)
 
@@ -362,11 +343,6 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(node *corev1.Node) er
 		return err
 	}
 
-	if r.isLeaseSupported {
-		if err := invalidateLease(r.Client, node.Name); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -375,11 +351,6 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(nodeName strin
 	if err != nil {
 		// if CR is gathered as result of garbage collection: the node may have been deleted, but the CR has not yet been deleted, still we must clean up the lease!
 		if errors.IsNotFound(err) {
-			if r.isLeaseSupported {
-				if err := invalidateLease(r.Client, nodeName); err != nil {
-					return err
-				}
-			}
 			return nil
 		}
 		return err
