@@ -44,11 +44,11 @@ import (
 )
 
 const (
-	MaxAllowedErrorToUpdateOwnedLease = 3
-	WaitDurationOnDrainError          = 5 * time.Second
+	maxAllowedErrorToUpdateOwnedLease = 3
+	waitDurationOnDrainError          = 5 * time.Second
 	FixedDurationReconcileLog         = "Reconciling with fixed duration"
 
-	//lease params
+	//lease consts
 	leaseNamespaceDefault = "node-maintenance"
 	LeaseHolderIdentity   = "node-maintenance"
 	LeaseDuration         = 3600 * time.Second
@@ -56,7 +56,7 @@ const (
 )
 
 var (
-	LeaseNamespace = leaseNamespaceDefault
+	leaseNamespace = leaseNamespaceDefault
 )
 
 // NodeMaintenanceReconciler reconciles a NodeMaintenance object
@@ -161,7 +161,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	updateOwnedLeaseFailed, err := r.obtainLease(node)
 	if err != nil && updateOwnedLeaseFailed {
 		instance.Status.ErrorOnLeaseCount += 1
-		if instance.Status.ErrorOnLeaseCount > MaxAllowedErrorToUpdateOwnedLease {
+		if instance.Status.ErrorOnLeaseCount > maxAllowedErrorToUpdateOwnedLease {
 			r.logger.Info("can't extend owned lease. uncordon for now")
 
 			// Uncordon the node
@@ -171,7 +171,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			}
 			instance.Status.Phase = nodemaintenancev1beta1.MaintenanceFailed
 		}
-		return r.onReconcileError(instance, fmt.Errorf("Failed to extend lease owned by us : %v errorOnLeaseCount %d", err, instance.Status.ErrorOnLeaseCount))
+		return r.onReconcileError(instance, fmt.Errorf("failed to extend lease owned by us : %v errorOnLeaseCount %d", err, instance.Status.ErrorOnLeaseCount))
 	}
 	if err != nil {
 		instance.Status.ErrorOnLeaseCount = 0
@@ -197,7 +197,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	if err = drain.RunNodeDrain(r.drainer, nodeName); err != nil {
 		r.logger.Info("Not all pods evicted", "nodeName", nodeName, "error", err)
-		waitOnReconcile := WaitDurationOnDrainError
+		waitOnReconcile := waitDurationOnDrainError
 		return r.onReconcileErrorWithRequeue(instance, err, &waitOnReconcile)
 	} else if instance.Status.Phase != nodemaintenancev1beta1.MaintenanceSucceeded {
 		setLastUpdate(instance)
@@ -241,7 +241,7 @@ func onPodDeletedOrEvicted(pod *corev1.Pod, usingEviction bool) {
 }
 
 func SetLeaseNamespace(namespace string) {
-	LeaseNamespace = namespace
+	leaseNamespace = namespace
 }
 
 func initDrainer(r *NodeMaintenanceReconciler, config *rest.Config) error {
@@ -313,7 +313,7 @@ func (r *NodeMaintenanceReconciler) setOwnerRefToNode(instance *nodemaintenancev
 
 func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error) {
 	r.logger.Info("Lease object supported, obtaining lease")
-	lease, needUpdate, err := r.LeaseManager.CreateOrGetLease(context.Background(), node, LeaseDuration, LeaseHolderIdentity, LeaseNamespace)
+	leaseObtained, needUpdate, err := r.LeaseManager.CreateOrGetLease(context.Background(), node, LeaseDuration, LeaseHolderIdentity, leaseNamespace)
 
 	if err != nil {
 		r.logger.Error(err, "failed to create or get existing lease")
@@ -325,7 +325,7 @@ func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error)
 		r.logger.Info("update lease")
 
 		now := metav1.NowMicro()
-		if updateOwnedLeaseFailed, err := r.LeaseManager.UpdateLease(context.Background(), node, lease, &now, LeaseDuration, DrainerTimeout, LeaseHolderIdentity); err != nil {
+		if updateOwnedLeaseFailed, err := r.LeaseManager.UpdateLease(context.Background(), node, leaseObtained, &now, LeaseDuration, DrainerTimeout, LeaseHolderIdentity); err != nil {
 			return updateOwnedLeaseFailed, err
 		}
 	}
@@ -376,7 +376,7 @@ func (r *NodeMaintenanceReconciler) initMaintenanceStatus(nm *nodemaintenancev1b
 		setLastUpdate(nm)
 		pendingList, errlist := r.drainer.GetPodsForDeletion(nm.Spec.NodeName)
 		if errlist != nil {
-			return fmt.Errorf("Failed to get pods for eviction while initializing status")
+			return fmt.Errorf("failed to get pods for eviction while initializing status")
 		}
 		if pendingList != nil {
 			nm.Status.PendingPods = GetPodNameList(pendingList.Pods())
