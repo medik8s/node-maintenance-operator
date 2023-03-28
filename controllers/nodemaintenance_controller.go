@@ -39,20 +39,30 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/medik8s/common/pkg/lease"
 	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/api/v1beta1"
 )
 
 const (
 	MaxAllowedErrorToUpdateOwnedLease = 3
-	DrainerTimeout                    = 30 * time.Second
 	WaitDurationOnDrainError          = 5 * time.Second
 	FixedDurationReconcileLog         = "Reconciling with fixed duration"
+
+	LeaseNamespaceDefault = "node-maintenance"
+	LeaseHolderIdentity   = "node-maintenance"
+	LeaseDuration         = 3600 * time.Second
+	DrainerTimeout        = 30 * time.Second
+)
+
+var (
+	LeaseNamespace = LeaseNamespaceDefault
 )
 
 // NodeMaintenanceReconciler reconciles a NodeMaintenance object
 type NodeMaintenanceReconciler struct {
 	client.Client
 	Scheme           *runtime.Scheme
+	LeaseManager     lease.Manager
 	drainer          *drain.Helper
 	isLeaseSupported bool
 	logger           logr.Logger
@@ -316,12 +326,13 @@ func (r *NodeMaintenanceReconciler) setOwnerRefToNode(instance *nodemaintenancev
 }
 
 func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error) {
+
 	if !r.isLeaseSupported {
 		return false, nil
 	}
 
 	r.logger.Info("Lease object supported, obtaining lease")
-	lease, needUpdate, err := createOrGetExistingLease(r.Client, node, LeaseDuration)
+	lease, needUpdate, err := r.LeaseManager.CreateOrGetLease(context.Background(), node, LeaseDuration, LeaseHolderIdentity, LeaseNamespace)
 
 	if err != nil {
 		r.logger.Error(err, "failed to create or get existing lease")
@@ -333,7 +344,7 @@ func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error)
 		r.logger.Info("update lease")
 
 		now := metav1.NowMicro()
-		if err, updateOwnedLeaseFailed := updateLease(r.Client, node, lease, &now, LeaseDuration); err != nil {
+		if updateOwnedLeaseFailed, err := r.LeaseManager.UpdateLease(context.Background(), node, lease, &now, LeaseDuration, DrainerTimeout, LeaseHolderIdentity); err != nil {
 			return updateOwnedLeaseFailed, err
 		}
 	}

@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	nodemaintenanceapi "github.com/medik8s/node-maintenance-operator/api/v1beta1"
+	"github.com/medik8s/common/pkg/lease"
 )
 
 var _ = Describe("Node Maintenance", func() {
@@ -66,9 +67,10 @@ var _ = Describe("Node Maintenance", func() {
 		// Create a ReconcileNodeMaintenance object with the scheme and fake client
 		// TODO add reconciler to manager in suite_test.go and don't call reconcile funcs manually
 		r = &NodeMaintenanceReconciler{
-			Client: k8sClient,
-			Scheme: scheme.Scheme,
-			logger: ctrl.Log.WithName("unit test"),
+			Client:       k8sClient,
+			Scheme:       scheme.Scheme,
+			LeaseManager: lease.NewManager(k8sClient),
+			logger:       ctrl.Log.WithName("unit test"),
 		}
 		initDrainer(r, cfg)
 

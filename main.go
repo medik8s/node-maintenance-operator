@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/medik8s/common/pkg/lease"
 	"os"
 	"runtime"
 
@@ -83,9 +84,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	client := mgr.GetClient()
 	if err = (&controllers.NodeMaintenanceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:       client,
+		Scheme:       mgr.GetScheme(),
+		LeaseManager: lease.NewManager(client),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeMaintenance")
 		os.Exit(1)
