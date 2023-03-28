@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/medik8s/common/pkg/lease"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -16,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/medik8s/common/pkg/lease"
 	nodemaintenanceapi "github.com/medik8s/node-maintenance-operator/api/v1beta1"
 )
 

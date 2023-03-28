@@ -19,9 +19,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/medik8s/common/pkg/lease"
 	"os"
 	"runtime"
+
+	"github.com/medik8s/common/pkg/lease"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
