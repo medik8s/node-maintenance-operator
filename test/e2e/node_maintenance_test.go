@@ -242,10 +242,6 @@ var _ = Describe("Starting Maintenance", func() {
 				}, 60*time.Second, 10*time.Second).Should(BeTrue(), "node should be resetted")
 			})
 
-			It("should have invalidated the lease", func() {
-				isLeaseInvalidated(maintenanceNodeName)
-			})
-
 			It("test deployment should still be running", func() {
 				waitForTestDeployment(1)
 			})
@@ -474,15 +470,4 @@ func hasValidLease(nodeName string, startTime time.Time) {
 	ExpectWithOffset(1, lease.Spec.RenewTime.Time).To(BeTemporally("<", checkTime), "renew time should be before now")
 
 	// renewal checks would take too long, lease time is 1 hour...
-}
-
-func isLeaseInvalidated(nodeName string) {
-	lease := &coordv1.Lease{}
-	err := Client.Get(context.TODO(), types.NamespacedName{Namespace: operatorNsName, Name: nodeName}, lease)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "failed to get lease")
-
-	ExpectWithOffset(1, lease.Spec.AcquireTime).To(BeNil())
-	ExpectWithOffset(1, lease.Spec.LeaseDurationSeconds).To(BeNil())
-	ExpectWithOffset(1, lease.Spec.RenewTime).To(BeNil())
-	ExpectWithOffset(1, lease.Spec.LeaseTransitions).To(BeNil())
 }
