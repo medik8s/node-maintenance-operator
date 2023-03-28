@@ -3,11 +3,13 @@ package controllers
 import (
 	"context"
 	"reflect"
+	"time"
 
 	"github.com/medik8s/common/pkg/lease"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -69,7 +71,7 @@ var _ = Describe("Node Maintenance", func() {
 		r = &NodeMaintenanceReconciler{
 			Client:       k8sClient,
 			Scheme:       scheme.Scheme,
-			LeaseManager: lease.NewManager(k8sClient),
+			LeaseManager: &mockLeaseManager{lease.NewManager(k8sClient)},
 			logger:       ctrl.Log.WithName("unit test"),
 		}
 		initDrainer(r, cfg)
@@ -317,4 +319,12 @@ func getTestNM() *nodemaintenanceapi.NodeMaintenance {
 			Reason:   "test reason",
 		},
 	}
+}
+
+type mockLeaseManager struct {
+	lease.Manager
+}
+
+func (mock *mockLeaseManager) CreateOrGetLease(ctx context.Context, node *corev1.Node, duration time.Duration, holderIdentity string, namespace string) (*coordv1.Lease, bool, error) {
+	return nil, false, nil
 }
