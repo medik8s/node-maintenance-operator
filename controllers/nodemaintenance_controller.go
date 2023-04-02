@@ -126,7 +126,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		// The object is being deleted
 		if ContainsString(instance.ObjectMeta.Finalizers, nodemaintenancev1beta1.NodeMaintenanceFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
 			// Stop node maintenance - uncordon and remove live migration taint from the node.
-			if err := r.stopNodeMaintenanceOnDeletion(instance.Spec.NodeName); err != nil {
+			if err := r.stopNodeMaintenanceOnDeletion(ctx, instance.Spec.NodeName); err != nil {
 				r.logger.Error(err, "error stopping node maintenance")
 				if errors.IsNotFound(err) == false {
 					return r.onReconcileError(instance, err)
@@ -165,7 +165,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			r.logger.Info("can't extend owned lease. uncordon for now")
 
 			// Uncordon the node
-			err = r.stopNodeMaintenanceImp(node)
+			err = r.stopNodeMaintenanceImp(ctx, node)
 			if err != nil {
 				return r.onReconcileError(instance, fmt.Errorf("Failed to uncordon upon failure to obtain owned lease : %v ", err))
 			}
@@ -332,7 +332,7 @@ func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error)
 
 	return false, nil
 }
-func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(node *corev1.Node) error {
+func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, node *corev1.Node) error {
 	// Uncordon the node
 	err := AddOrRemoveTaint(r.drainer.Client, node, false)
 	if err != nil {
@@ -343,19 +343,26 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(node *corev1.Node) er
 		return err
 	}
 
+	if err := r.LeaseManager.InvalidateLease(ctx, node.Name, leaseNamespace); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(nodeName string) error {
+func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Context, nodeName string) error {
 	node, err := r.fetchNode(nodeName)
 	if err != nil {
 		// if CR is gathered as result of garbage collection: the node may have been deleted, but the CR has not yet been deleted, still we must clean up the lease!
 		if errors.IsNotFound(err) {
+			if err := r.LeaseManager.InvalidateLease(ctx, nodeName, leaseNamespace); err != nil {
+				return err
+			}
 			return nil
 		}
 		return err
 	}
-	return r.stopNodeMaintenanceImp(node)
+	return r.stopNodeMaintenanceImp(ctx, node)
 }
 
 func (r *NodeMaintenanceReconciler) fetchNode(nodeName string) (*corev1.Node, error) {
