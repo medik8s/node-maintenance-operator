@@ -49,12 +49,13 @@ jobs:
             ## Notable Changes
             
             * TODO
+            
             ## Release Artifacts
             
             ### Images
-            * Operator: quay.io/repository/medik8s/node-maintenance-operator:${{ github.ref_name }}
-            * Bundle: quay.io/repository/medik8s/node-maintenance-operator-bundle:${{ github.ref_name }}
-            * Catalog aka Index: quay.io/repository/medik8s/node-maintenance-operator-catalog:${{ github.ref_name }}
+            * Operator: quay.io/medik8s/node-maintenance-operator:${{ github.ref_name }}
+            * Bundle: quay.io/medik8s/node-maintenance-operator-bundle:${{ github.ref_name }}
+            * Catalog aka Index: quay.io/medik8s/node-maintenance-operator-catalog:${{ github.ref_name }}
             
             ### Source code and OLM manifests
             Please find the source code and the OLM manifests in the `Assets` section below.
