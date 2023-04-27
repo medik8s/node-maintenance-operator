@@ -23,4 +23,4 @@ jobs: # jobs to run
       run: make check
 
     - name: Build images
-      run: make container-build
+      run: make container-build-community
