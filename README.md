@@ -162,7 +162,7 @@ For every major / minor / patch release:
 
   - create and push the `vx.y.z` tag.
   - this should trigger CI to build and push new images
-    - if it fails, the manual fallback is `VERSION=x.y.z make container-build container-push`
+  - if it fails, the manual fallback is `VERSION=x.y.z make container-build-and-push-community`
   - make the git tag a release in the GitHub UI.
 
 ## Help
