@@ -203,7 +203,7 @@ bundle-update: ## Update containerImage, createdAt, and icon fields in the bundl
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
-	$(OPERATOR_SDK) bundle validate ./bundle
+	$(MAKE) bundle-validate
 
 .PHONY: bundle-reset-date
 bundle-reset-date: ## Reset bundle's createdAt
