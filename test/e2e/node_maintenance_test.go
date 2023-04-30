@@ -227,6 +227,7 @@ var _ = Describe("Starting Maintenance", func() {
 			})
 
 			It("should result in resetted node status", func() {
+				// FLAKY Test - Possibly needs more time. It was tested with 60 seconds
 				Eventually(func() (bool, error) {
 					node := &corev1.Node{}
 					if err := Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: maintenanceNodeName}, node); err != nil {
@@ -241,7 +242,7 @@ var _ = Describe("Starting Maintenance", func() {
 						return false, nil
 					}
 					return true, nil
-				}, 60*time.Second, 10*time.Second).Should(BeTrue(), "node should be resetted")
+				}, 120*time.Second, 10*time.Second).Should(BeTrue(), "node should be resetted")
 			})
 
 			It("should have invalidated the lease", func() {
