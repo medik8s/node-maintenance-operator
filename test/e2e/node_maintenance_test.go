@@ -64,7 +64,8 @@ var _ = Describe("Starting Maintenance", func() {
 			if len(controlPlaneNodes) < 3 {
 				Skip("cluster has less than 3 master/control-plane nodes and is to small for running this test")
 			}
-			Expect(err).ToNot(HaveOccurred())
+			// FLAKY Test - Possibly needs more time. It was tested with 0 seconds and got ErrorControlPlaneQuorumViolation error
+			ExpectWithOffset(1, err).ToNot(HaveOccurred())
 		})
 
 		It("should fail", func() {
