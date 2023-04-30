@@ -484,8 +484,9 @@ func isLeaseInvalidated(nodeName string) {
 	err := Client.Get(context.TODO(), types.NamespacedName{Namespace: operatorNsName, Name: nodeName}, lease)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "failed to get lease")
 
-	ExpectWithOffset(1, lease.Spec.AcquireTime).To(BeNil())
-	ExpectWithOffset(1, lease.Spec.LeaseDurationSeconds).To(BeNil())
-	ExpectWithOffset(1, lease.Spec.RenewTime).To(BeNil())
-	ExpectWithOffset(1, lease.Spec.LeaseTransitions).To(BeNil())
+	// FLAKY Test - Possibly needs more time. It was tested with 1 seconds
+	ExpectWithOffset(2, lease.Spec.AcquireTime).To(BeNil())
+	ExpectWithOffset(2, lease.Spec.LeaseDurationSeconds).To(BeNil())
+	ExpectWithOffset(2, lease.Spec.RenewTime).To(BeNil())
+	ExpectWithOffset(2, lease.Spec.LeaseTransitions).To(BeNil())
 }
