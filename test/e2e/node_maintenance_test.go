@@ -101,8 +101,9 @@ var _ = Describe("Starting Maintenance", func() {
 				Skip("unexpected big cluster, no clue if 2nd master/control-plane maintenance is fine or not")
 			}
 
+			// FLAKY Test - Possibly needs more time. It was tested with 10 seconds and got nil.
 			// the etcd-quorum-guard PDB needs some time to be updated after the 1st control-plane node was set into maintenance
-			time.Sleep(10 * time.Second)
+			time.Sleep(20 * time.Second)
 
 			controlPlaneNode := controlPlaneNodes[1]
 			nodeMaintenance := getNodeMaintenance(fmt.Sprintf("test-2nd-control-plane-%s", controlPlaneNode), controlPlaneNode)
