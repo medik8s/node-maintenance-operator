@@ -460,7 +460,7 @@ func isTainted(node *corev1.Node) bool {
 
 func hasValidLease(nodeName string, startTime time.Time) {
 	lease := &coordv1.Lease{}
-	err := Client.Get(context.TODO(), types.NamespacedName{Namespace: operatorNsName, Name: nodeName}, lease)
+	err := Client.Get(context.TODO(), types.NamespacedName{Namespace: operatorNsName, Name: fmt.Sprintf("Node-%s", nodeName)}, lease)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "failed to get lease")
 
 	ExpectWithOffset(1, *lease.Spec.LeaseDurationSeconds).To(Equal(int32(nodemaintenance.LeaseDuration.Seconds())))
