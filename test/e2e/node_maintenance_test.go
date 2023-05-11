@@ -478,6 +478,6 @@ func hasValidLease(nodeName string, startTime time.Time) {
 
 func isLeaseInvalidated(nodeName string) {
 	lease := &coordv1.Lease{}
-	err := Client.Get(context.TODO(), types.NamespacedName{Namespace: operatorNsName, Name: nodeName}, lease)
+	err := Client.Get(context.TODO(), types.NamespacedName{Namespace: operatorNsName, Name: fmt.Sprintf("Node-%s", nodeName)}, lease)
 	Expect(apierrors.IsNotFound(err)).To(BeTrue())
 }
