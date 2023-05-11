@@ -479,10 +479,5 @@ func hasValidLease(nodeName string, startTime time.Time) {
 func isLeaseInvalidated(nodeName string) {
 	lease := &coordv1.Lease{}
 	err := Client.Get(context.TODO(), types.NamespacedName{Namespace: operatorNsName, Name: nodeName}, lease)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "failed to get lease")
-
-	ExpectWithOffset(1, lease.Spec.AcquireTime).To(BeNil())
-	ExpectWithOffset(1, lease.Spec.LeaseDurationSeconds).To(BeNil())
-	ExpectWithOffset(1, lease.Spec.RenewTime).To(BeNil())
-	ExpectWithOffset(1, lease.Spec.LeaseTransitions).To(BeNil())
+	Expect(apierrors.IsNotFound(err)).To(BeTrue())
 }
