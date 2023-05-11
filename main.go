@@ -85,11 +85,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	if namespace, found := os.LookupEnv("OPERATOR_NAMESPACE"); found {
+		controllers.SetLeaseNamespace(namespace)
+	}
+
 	client := mgr.GetClient()
 	if err = (&controllers.NodeMaintenanceReconciler{
 		Client:       client,
 		Scheme:       mgr.GetScheme(),
-		LeaseManager: lease.NewManager(client),
+		LeaseManager: lease.NewManager(client, controllers.LeaseHolderIdentity, controllers.LeaseNamespace),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeMaintenance")
 		os.Exit(1)
@@ -107,10 +111,6 @@ func main() {
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
-	}
-
-	if namespace, found := os.LookupEnv("OPERATOR_NAMESPACE"); found {
-		controllers.SetLeaseNamespace(namespace)
 	}
 
 	setupLog.Info("starting manager")

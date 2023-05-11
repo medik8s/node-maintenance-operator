@@ -128,8 +128,8 @@ github.com/mailru/easyjson/jwriter
 # github.com/matttproud/golang_protobuf_extensions v1.0.2
 ## explicit; go 1.9
 github.com/matttproud/golang_protobuf_extensions/pbutil
-# github.com/medik8s/common v0.0.0-00010101000000-000000000000 => github.com/mshitrit/common v0.0.1
-## explicit; go 1.19
+# github.com/medik8s/common v0.0.0-00010101000000-000000000000 => github.com/mshitrit/common v0.0.2
+## explicit; go 1.20
 github.com/medik8s/common/pkg/lease
 # github.com/mitchellh/go-wordwrap v1.0.0
 ## explicit
@@ -839,4 +839,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# github.com/medik8s/common => github.com/mshitrit/common v0.0.1
+# github.com/medik8s/common => github.com/mshitrit/common v0.0.2

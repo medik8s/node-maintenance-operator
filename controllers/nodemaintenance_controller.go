@@ -56,7 +56,7 @@ const (
 )
 
 var (
-	leaseNamespace = leaseNamespaceDefault
+	LeaseNamespace = leaseNamespaceDefault
 )
 
 // NodeMaintenanceReconciler reconciles a NodeMaintenance object
@@ -241,7 +241,7 @@ func onPodDeletedOrEvicted(pod *corev1.Pod, usingEviction bool) {
 }
 
 func SetLeaseNamespace(namespace string) {
-	leaseNamespace = namespace
+	LeaseNamespace = namespace
 }
 
 func initDrainer(r *NodeMaintenanceReconciler, config *rest.Config) error {
@@ -313,21 +313,11 @@ func (r *NodeMaintenanceReconciler) setOwnerRefToNode(instance *nodemaintenancev
 
 func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error) {
 	r.logger.Info("Lease object supported, obtaining lease")
-	leaseObtained, needUpdate, err := r.LeaseManager.CreateOrGetLease(context.Background(), node, LeaseDuration, LeaseHolderIdentity, leaseNamespace)
+	err := r.LeaseManager.RequestLease(context.Background(), node, LeaseDuration)
 
 	if err != nil {
 		r.logger.Error(err, "failed to create or get existing lease")
 		return false, err
-	}
-
-	if needUpdate {
-
-		r.logger.Info("update lease")
-
-		now := metav1.NowMicro()
-		if updateOwnedLeaseFailed, err := r.LeaseManager.UpdateLease(context.Background(), node, leaseObtained, &now, LeaseDuration, DrainerTimeout, LeaseHolderIdentity); err != nil {
-			return updateOwnedLeaseFailed, err
-		}
 	}
 
 	return false, nil
@@ -343,7 +333,7 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, 
 		return err
 	}
 
-	if err := r.LeaseManager.InvalidateLease(ctx, node.Name, leaseNamespace); err != nil {
+	if err := r.LeaseManager.InvalidateLease(ctx, node); err != nil {
 		return err
 	}
 
@@ -355,7 +345,7 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Co
 	if err != nil {
 		// if CR is gathered as result of garbage collection: the node may have been deleted, but the CR has not yet been deleted, still we must clean up the lease!
 		if errors.IsNotFound(err) {
-			if err := r.LeaseManager.InvalidateLease(ctx, nodeName, leaseNamespace); err != nil {
+			if err := r.LeaseManager.InvalidateLease(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}); err != nil {
 				return err
 			}
 			return nil

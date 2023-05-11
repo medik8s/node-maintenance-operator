@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -71,7 +70,7 @@ var _ = Describe("Node Maintenance", func() {
 		r = &NodeMaintenanceReconciler{
 			Client:       k8sClient,
 			Scheme:       scheme.Scheme,
-			LeaseManager: &mockLeaseManager{lease.NewManager(k8sClient)},
+			LeaseManager: &mockLeaseManager{lease.NewManager(k8sClient, "", "")},
 			logger:       ctrl.Log.WithName("unit test"),
 		}
 		_ = initDrainer(r, cfg)
@@ -325,6 +324,6 @@ type mockLeaseManager struct {
 	lease.Manager
 }
 
-func (mock *mockLeaseManager) CreateOrGetLease(_ context.Context, _ *corev1.Node, _ time.Duration, _ string, _ string) (*coordv1.Lease, bool, error) {
-	return nil, false, nil
+func (mock *mockLeaseManager) RequestLease(_ context.Context, _ client.Object, _ time.Duration) error {
+	return nil
 }
