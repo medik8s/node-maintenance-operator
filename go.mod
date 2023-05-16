@@ -100,4 +100,4 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace github.com/medik8s/common => github.com/mshitrit/common v0.0.2
+replace github.com/medik8s/common => github.com/mshitrit/common v0.0.6

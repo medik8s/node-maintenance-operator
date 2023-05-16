@@ -3,12 +3,14 @@ package lease
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
 	log "github.com/sirupsen/logrus"
 
 	coordv1 "k8s.io/api/coordination/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -63,12 +65,18 @@ func NewManagerWithCustomLogger(cl client.Client, holderIdentity string, namespa
 
 func (l *manager) createLease(ctx context.Context, obj client.Object, duration time.Duration) error {
 	log.Info("create lease")
-	owner := makeExpectedOwnerOfLease(obj)
+	kind, _, err := getObjKindVersion(obj)
+	if err != nil {
+		l.log.Error(err, "couldn't fetch obj kind")
+		return err
+	}
+	//no need to check for error, already checked
+	owner, _ := makeExpectedOwnerOfLease(obj)
 	microTimeNow := metav1.NowMicro()
 
 	lease := &coordv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            generateLeaseName(obj),
+			Name:            generateLeaseName(kind, obj.GetName()),
 			Namespace:       l.namespace,
 			OwnerReferences: []metav1.OwnerReference{*owner},
 		},
@@ -130,7 +138,8 @@ func (l *manager) requestLease(ctx context.Context, obj client.Object, leaseDura
 				lease.Spec.LeaseTransitions = pointer.Int32(1)
 			}
 		}
-		owner := makeExpectedOwnerOfLease(obj)
+		//no need to check for error, was already checked at the top getLease statement
+		owner, _ := makeExpectedOwnerOfLease(obj)
 		lease.ObjectMeta.OwnerReferences = []metav1.OwnerReference{*owner}
 		lease.Spec.HolderIdentity = &l.holderIdentity
 		lease.Spec.LeaseDurationSeconds = pointer.Int32(int32(leaseDuration.Seconds()))
@@ -161,14 +170,17 @@ func (l *manager) invalidateLease(ctx context.Context, obj client.Object) error 
 	return nil
 }
 
-func makeExpectedOwnerOfLease(obj client.Object) *metav1.OwnerReference {
-
+func makeExpectedOwnerOfLease(obj client.Object) (*metav1.OwnerReference, error) {
+	kind, version, err := getObjKindVersion(obj)
+	if err != nil {
+		return nil, err
+	}
 	return &metav1.OwnerReference{
-		APIVersion: obj.GetObjectKind().GroupVersionKind().Version,
-		Kind:       obj.GetObjectKind().GroupVersionKind().Kind,
+		APIVersion: version,
+		Kind:       kind,
 		Name:       obj.GetName(),
 		UID:        obj.GetUID(),
-	}
+	}, nil
 }
 
 func leaseDueTime(lease *coordv1.Lease) time.Time {
@@ -210,7 +222,12 @@ func isValidLease(lease *coordv1.Lease, currentTime time.Time) bool {
 
 func (l *manager) getLease(ctx context.Context, obj client.Object) (*coordv1.Lease, error) {
 	log.Info("getting lease")
-	nName := apitypes.NamespacedName{Namespace: l.namespace, Name: generateLeaseName(obj)}
+	kind, _, err := getObjKindVersion(obj)
+	if err != nil {
+		l.log.Error(err, "couldn't fetch obj kind")
+		return nil, err
+	}
+	nName := apitypes.NamespacedName{Namespace: l.namespace, Name: generateLeaseName(kind, obj.GetName())}
 	lease := &coordv1.Lease{}
 
 	if err := l.Client.Get(ctx, nName, lease); err != nil {
@@ -223,6 +240,24 @@ func (l *manager) getLease(ctx context.Context, obj client.Object) (*coordv1.Lea
 	return lease, nil
 }
 
-func generateLeaseName(obj client.Object) string {
-	return fmt.Sprintf("%s-%s", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetName())
+func generateLeaseName(kind string, name string) string {
+	return strings.ToLower(fmt.Sprintf("%s-%s", kind, name))
+}
+
+func getObjKindVersion(obj client.Object) (string, string, error) {
+	kind := obj.GetObjectKind().GroupVersionKind().Kind
+	version := obj.GetObjectKind().GroupVersionKind().Version
+
+	if len(kind) == 0 || len(version) == 0 {
+		if _, ok := obj.(*v1.Node); ok {
+			kind = v1.SchemeGroupVersion.WithKind("Node").Kind
+			version = v1.SchemeGroupVersion.WithKind("Node").Version
+		} else if _, ok := obj.(*v1.Pod); ok {
+			kind = v1.SchemeGroupVersion.WithKind("Pod").Kind
+			version = v1.SchemeGroupVersion.WithKind("Pod").Version
+		} else {
+			return "", "", fmt.Errorf("couldn't find kind or version for obj %s", obj.GetName())
+		}
+	}
+	return kind, version, nil
 }
