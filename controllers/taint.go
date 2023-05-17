@@ -93,7 +93,7 @@ func addTaints(oldTaints []corev1.Taint, newTaints *[]corev1.Taint) bool {
 
 // deleteTaint removes all the taints that have the same key and effect to given taintToDelete.
 func deleteTaint(taints []corev1.Taint, taintToDelete *corev1.Taint) []corev1.Taint {
-	newTaints := []corev1.Taint{}
+	var newTaints []corev1.Taint
 	for i := range taints {
 		if taintToDelete.MatchTaint(&taints[i]) {
 			continue

@@ -3,7 +3,9 @@ package controllers
 import (
 	"context"
 	"reflect"
+	"time"
 
+	"github.com/medik8s/common/pkg/lease"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -42,7 +44,7 @@ var _ = Describe("Node Maintenance", func() {
 	}
 
 	reconcileMaintenance := func(nm *nodemaintenanceapi.NodeMaintenance) {
-		r.Reconcile(context.Background(), req)
+		_, _ = r.Reconcile(context.Background(), req)
 	}
 
 	taintExist := func(node *corev1.Node, key string, effect corev1.TaintEffect) bool {
@@ -66,11 +68,12 @@ var _ = Describe("Node Maintenance", func() {
 		// Create a ReconcileNodeMaintenance object with the scheme and fake client
 		// TODO add reconciler to manager in suite_test.go and don't call reconcile funcs manually
 		r = &NodeMaintenanceReconciler{
-			Client: k8sClient,
-			Scheme: scheme.Scheme,
-			logger: ctrl.Log.WithName("unit test"),
+			Client:       k8sClient,
+			Scheme:       scheme.Scheme,
+			LeaseManager: &mockLeaseManager{lease.NewManager(k8sClient, "", "")},
+			logger:       ctrl.Log.WithName("unit test"),
 		}
-		initDrainer(r, cfg)
+		_ = initDrainer(r, cfg)
 
 		// in test pods are not evicted, so don't wait forever for them
 		r.drainer.SkipWaitForDeleteTimeoutSeconds = 0
@@ -110,7 +113,7 @@ var _ = Describe("Node Maintenance", func() {
 	Context("Initialization test", func() {
 
 		It("Node maintenance should be initialized properly", func() {
-			r.initMaintenanceStatus(nm)
+			_ = r.initMaintenanceStatus(nm)
 			maintenance := &nodemaintenanceapi.NodeMaintenance{}
 			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
 			Expect(err).NotTo(HaveOccurred())
@@ -123,7 +126,7 @@ var _ = Describe("Node Maintenance", func() {
 		})
 
 		It("owner ref should be set properly", func() {
-			r.initMaintenanceStatus(nm)
+			_ = r.initMaintenanceStatus(nm)
 			maintenance := &nodemaintenanceapi.NodeMaintenance{}
 			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
 			node := &corev1.Node{}
@@ -143,7 +146,7 @@ var _ = Describe("Node Maintenance", func() {
 		It("Should not init Node maintenance if already set", func() {
 			nmCopy := nm.DeepCopy()
 			nmCopy.Status.Phase = nodemaintenanceapi.MaintenanceRunning
-			r.initMaintenanceStatus(nmCopy)
+			_ = r.initMaintenanceStatus(nmCopy)
 			maintenance := &nodemaintenanceapi.NodeMaintenance{}
 			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
 			Expect(err).NotTo(HaveOccurred())
@@ -162,7 +165,7 @@ var _ = Describe("Node Maintenance", func() {
 			node := &corev1.Node{}
 			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, node)
 			Expect(err).NotTo(HaveOccurred())
-			AddOrRemoveTaint(r.drainer.Client, node, true)
+			_ = AddOrRemoveTaint(r.drainer.Client, node, true)
 			taintedNode := &corev1.Node{}
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, taintedNode)
 			Expect(err).NotTo(HaveOccurred())
@@ -179,12 +182,12 @@ var _ = Describe("Node Maintenance", func() {
 			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, node)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(taintExist(node, "medik8s.io/drain", corev1.TaintEffectNoSchedule)).To(BeFalse())
-			AddOrRemoveTaint(r.drainer.Client, node, true)
+			_ = AddOrRemoveTaint(r.drainer.Client, node, true)
 			taintedNode := &corev1.Node{}
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, taintedNode)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(taintExist(taintedNode, "medik8s.io/drain", corev1.TaintEffectNoSchedule)).To(BeTrue())
-			AddOrRemoveTaint(r.drainer.Client, taintedNode, false)
+			_ = AddOrRemoveTaint(r.drainer.Client, taintedNode, false)
 			unTaintedNode := &corev1.Node{}
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, unTaintedNode)
 			Expect(err).NotTo(HaveOccurred())
@@ -267,7 +270,7 @@ func getTestObjects() (*nodemaintenanceapi.NodeMaintenance, []client.Object) {
 						Image: "i1",
 					},
 				},
-				TerminationGracePeriodSeconds: pointer.Int64Ptr(0),
+				TerminationGracePeriodSeconds: pointer.Int64(0),
 			},
 			Status: corev1.PodStatus{
 				Conditions: []corev1.PodCondition{
@@ -291,7 +294,7 @@ func getTestObjects() (*nodemaintenanceapi.NodeMaintenance, []client.Object) {
 						Image: "i1",
 					},
 				},
-				TerminationGracePeriodSeconds: pointer.Int64Ptr(0),
+				TerminationGracePeriodSeconds: pointer.Int64(0),
 			},
 			Status: corev1.PodStatus{
 				Conditions: []corev1.PodCondition{
@@ -315,4 +318,12 @@ func getTestNM() *nodemaintenanceapi.NodeMaintenance {
 			Reason:   "test reason",
 		},
 	}
+}
+
+type mockLeaseManager struct {
+	lease.Manager
+}
+
+func (mock *mockLeaseManager) RequestLease(_ context.Context, _ client.Object, _ time.Duration) error {
+	return nil
 }

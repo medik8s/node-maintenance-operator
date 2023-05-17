@@ -22,6 +22,8 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/medik8s/common/pkg/lease"
+
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -83,9 +85,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	if namespace, found := os.LookupEnv("OPERATOR_NAMESPACE"); found {
+		controllers.SetLeaseNamespace(namespace)
+	}
+
+	client := mgr.GetClient()
 	if err = (&controllers.NodeMaintenanceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:       client,
+		Scheme:       mgr.GetScheme(),
+		LeaseManager: lease.NewManager(client, controllers.LeaseHolderIdentity, controllers.LeaseNamespace),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeMaintenance")
 		os.Exit(1)
@@ -103,10 +111,6 @@ func main() {
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
-	}
-
-	if namespace, found := os.LookupEnv("OPERATOR_NAMESPACE"); found {
-		controllers.SetLeaseNamespace(namespace)
 	}
 
 	setupLog.Info("starting manager")

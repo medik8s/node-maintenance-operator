@@ -4,16 +4,18 @@ go 1.20
 
 require (
 	github.com/go-logr/logr v1.2.3
+	github.com/medik8s/common v1.0.0
 	github.com/onsi/ginkgo/v2 v2.9.1
-	github.com/onsi/gomega v1.27.3
+	github.com/onsi/gomega v1.27.4
 	github.com/sirupsen/logrus v1.9.0
-	k8s.io/api v0.26.1
-	k8s.io/apimachinery v0.26.1
-	k8s.io/client-go v0.26.1
+	k8s.io/api v0.26.3
+	k8s.io/apimachinery v0.26.3
+	k8s.io/client-go v0.26.3
 	k8s.io/klog v1.0.0
 	k8s.io/kubectl v0.26.0
-	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
-	sigs.k8s.io/controller-runtime v0.14.4
+	k8s.io/utils v0.0.0-20230313181309-38a27ef9d749
+	sigs.k8s.io/controller-runtime v0.14.5
+
 )
 
 require (
