@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/go-logr/logr v1.2.3
-	github.com/medik8s/common v0.0.0-00010101000000-000000000000
+	github.com/medik8s/common v1.0.0
 	github.com/onsi/ginkgo/v2 v2.9.1
 	github.com/onsi/gomega v1.27.4
 	github.com/sirupsen/logrus v1.9.0
@@ -99,5 +99,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
-
-replace github.com/medik8s/common => github.com/mshitrit/common v0.0.6
