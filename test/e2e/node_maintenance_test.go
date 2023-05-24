@@ -459,24 +459,24 @@ func isTainted(node *corev1.Node) bool {
 }
 
 func hasValidLease(nodeName string, startTime time.Time) {
-	Eventually(func() {
+	Eventually(func(g Gomega) {
 		lease := &coordv1.Lease{}
-		err := Client.Get(context.TODO(), types.NamespacedName{Namespace: operatorNsName, Name: fmt.Sprintf("Node-%s", nodeName)}, lease)
-		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "failed to get lease")
+		err := Client.Get(context.TODO(), types.NamespacedName{Namespace: operatorNsName, Name: fmt.Sprintf("node-%s", nodeName)}, lease)
+		g.ExpectWithOffset(1, err).ToNot(HaveOccurred(), "failed to get lease")
 
-		ExpectWithOffset(1, *lease.Spec.LeaseDurationSeconds).To(Equal(int32(nodemaintenance.LeaseDuration.Seconds())))
-		ExpectWithOffset(1, *lease.Spec.HolderIdentity).To(Equal(nodemaintenance.LeaseHolderIdentity))
+		g.ExpectWithOffset(1, *lease.Spec.LeaseDurationSeconds).To(Equal(int32(nodemaintenance.LeaseDuration.Seconds())))
+		g.ExpectWithOffset(1, *lease.Spec.HolderIdentity).To(Equal(nodemaintenance.LeaseHolderIdentity))
 
 		// renew and aquire time should be between maintenance start and now
 		checkTime := time.Now()
-		ExpectWithOffset(1, lease.Spec.AcquireTime.Time).To(BeTemporally(">", startTime), "acquire time should be after start time")
-		ExpectWithOffset(1, lease.Spec.AcquireTime.Time).To(BeTemporally("<", checkTime), "acquire time should be before now")
-		ExpectWithOffset(1, lease.Spec.RenewTime.Time).To(BeTemporally(">", startTime), "renew time should be after start time")
-		ExpectWithOffset(1, lease.Spec.RenewTime.Time).To(BeTemporally("<", checkTime), "renew time should be before now")
+		g.ExpectWithOffset(1, lease.Spec.AcquireTime.Time).To(BeTemporally(">", startTime), "acquire time should be after start time")
+		g.ExpectWithOffset(1, lease.Spec.AcquireTime.Time).To(BeTemporally("<", checkTime), "acquire time should be before now")
+		g.ExpectWithOffset(1, lease.Spec.RenewTime.Time).To(BeTemporally(">", startTime), "renew time should be after start time")
+		g.ExpectWithOffset(1, lease.Spec.RenewTime.Time).To(BeTemporally("<", checkTime), "renew time should be before now")
 
 		// renewal checks would take too long, lease time is 1 hour...})
 
-	}, 60*time.Second, 5*time.Second)
+	}, 60*time.Second, 5*time.Second).Should(Succeed())
 }
 
 func isLeaseInvalidated(nodeName string) {
