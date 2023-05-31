@@ -26,7 +26,13 @@ jobs: # jobs to run
 
     - name: Run checks and unit tests on a container
       run: make check
-
+    
+    - name: Set up Go # https://github.com/actions/setup-go/blob/main/action.yml
+      uses: actions/setup-go@v4
+      with: 
+        go-version-file: 'go.mod' 
+        cache-dependency-path: 'go.sum' 
+    
     - name: Lint Code Base
       run: make lint
     
