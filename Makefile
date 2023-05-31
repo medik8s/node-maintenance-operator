@@ -435,4 +435,4 @@ super-linter: ## Runs super linter locally (Supported Linters -> https://github.
 		-e FILTER_REGEX_EXCLUDE="/vendor/|/bin/" \
 		-v $$(pwd):/tmp/lint \
 		-w /tmp/lint \
-		github/super-linter:v5
+		github/super-linter:slim-v5
