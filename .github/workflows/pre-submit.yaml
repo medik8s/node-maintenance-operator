@@ -1,5 +1,10 @@
-# Understanding the workflow file - https://docs.github.com/en/actions/learn-github-actions/understanding-github-actions#understanding-the-workflow-file
+---
 name: Pre Submit # workflow name
+#
+# Documentation:
+# https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#understanding-the-workflow-file
+#
+
 on: # on events
   push:
     branches:
@@ -19,8 +24,11 @@ jobs: # jobs to run
       with:
         fetch-depth: 0
 
-    - name: Run checks and unit tests
+    - name: Run checks and unit tests on a container
       run: make check
 
+    - name: Lint Code Base
+      run: make lint
+    
     - name: Build images
       run: make container-build-community
