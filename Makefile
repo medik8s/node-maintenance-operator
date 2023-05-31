@@ -182,11 +182,11 @@ fix-imports: sort-imports ## Sort imports
 	$(SORT_IMPORTS) -w .
 
 .PHONY: test
-test: test-no-verify verify-unchanged ## Generate and format code, run tests, generate manifests and bundle, and verify no uncommitted changes
-
-.PHONY: test-no-verify
-test-no-verify: manifests generate go-verify test-imports fmt vet envtest ginkgo ## Generate and format code, and run tests
+test: manifests generate envtest ginkgo ## Generate code, and run unit tests
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -r --keep-going  --require-suite --vv ./api/... ./controllers/... --coverprofile cover.out
+
+.PHONY: lint
+lint: manifests generate go-verify fix-imports fmt vet super-linter verify-unchanged ## Generate and format code, fix the imports, verify unmodified files and run super-linter
 
 .PHONY: bundle-run
 export BUNDLE_RUN_NAMESPACE ?= openshift-operators
@@ -395,8 +395,8 @@ catalog-push: ## Push a catalog image.
 ##@ Targets used by CI
 
 .PHONY: check 
-check: ## Dockerized version of make test-no-verify
-	$(DOCKER_GO) "make test-no-verify"
+check: ## Dockerized version of make test
+	$(DOCKER_GO) "make test"
 
 .PHONY: verify-unchanged
 verify-unchanged: ## Verify there are no un-committed changes
