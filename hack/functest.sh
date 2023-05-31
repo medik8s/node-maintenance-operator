@@ -7,7 +7,7 @@ export TEST_NAMESPACE=node-maintenance-test
 # no colors in CI
 NO_COLOR=""
 set +e
-if ! which tput &>/dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
+if ! which tput &>/dev/null 2>&1 || [[ $(tput -T"$TERM" colors) -lt 8 ]]; then
     echo "Terminal does not seem to support colored output, disabling it"
     NO_COLOR="-noColor"
 fi
@@ -30,9 +30,9 @@ fi
 # --require-suite: If set, Ginkgo fails if there are ginkgo tests in a directory but no invocation of RunSpecs.
 # --no-color: If set, suppress color output in default reporter.
 # --vv: If set, emits with maximal verbosity - includes skipped and pending tests.
-./bin/ginkgo/$1/ginkgo -r --keep-going --require-suite $NO_COLOR --vv  ./test/e2e
+E2E_COMMAND=$(./bin/ginkgo/"$1"/ginkgo -r --keep-going --require-suite $NO_COLOR --vv  ./test/e2e)
 
-if [[ $? != 0 ]]; then
+if [[ "${E2E_COMMAND}" != 0 ]]; then
     echo "E2e tests FAILED"
     exit 1
 fi

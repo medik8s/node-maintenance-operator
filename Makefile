@@ -430,7 +430,7 @@ super-linter: ## Runs super linter locally (Supported Linters -> https://github.
 	docker run --rm \
 		-e RUN_LOCAL=true \
 		-e USE_FIND_ALGORITHM=true \
-		-e IGNORE_GITIGNORED_FILES=true \		
+		-e IGNORE_GITIGNORED_FILES=true \
 		-e LOG_LEVEL=NOTICE \
 		-e FILTER_REGEX_EXCLUDE="/vendor/|/bin/" \
 		-v $$(pwd):/tmp/lint \

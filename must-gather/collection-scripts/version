@@ -1,24 +1,25 @@
 #!/usr/bin/env bash
-export IMAGE=$( oc status | grep '^pod')
+IMAGE=$( oc status | grep '^pod')
+export IMAGE
 
 function version() {
 
   # get version from image (major.minor.micro, e.g. v4.11.0)
-  version=v$(sed -n -r -e 's/.*(([[:digit:]])+\.([[:digit:]])+\.([[:digit:]])+).*/\1/p' <<< $IMAGE)
+  version=v$(sed -n -r -e 's/.*(([[:digit:]])+\.([[:digit:]])+\.([[:digit:]])+).*/\1/p' <<< "$IMAGE")
 
   # if version is still not found, use 0.0.0-unknown
   [ -z "${version}" ] && version="0.0.0-unknown"
 
-  echo ${version}
+  echo "${version}"
 }
 
 function imageId() {
   # get image id (e.g. repository@digest )
-  imageId=$(sed -r -e 's/^pod.*runs //' <<< $IMAGE | awk '{print $2}')
+  imageId=$(sed -r -e 's/^pod.*runs //' <<< "$IMAGE" | awk '{print $2}')
   
   # if image_id is not found, use Unknown
   [ -z "${imageId}" ] && imageId="Unknown-Image"
   
-echo ${imageId}
+echo "${imageId}"
 
 }

@@ -5,11 +5,11 @@ mkdir -p must-gather/operator-pod-logs/
 
 # Generate /must-gather/version file
 DIR_NAME=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-. ${DIR_NAME}/version
+# shellcheck disable=SC1091
+source "${DIR_NAME}"/version
 echo "medik8s/node-maintenance-operator" > /must-gather/version # imageName - Source repo identifier
 version >> /must-gather/version # imageVersion  - Build version
 imageId >> /must-gather/version # imageID  -  repository@digest          
-OPERATOR_NAME="node-maintenance"
 
 # Init named resource list, eg. ns/openshift-config
 named_resources=()
@@ -30,10 +30,10 @@ group_resources+=(nodes)
 
 # NMO's CRD
 NMO_CRD=$(oc get crds -o jsonpath='{range .items[*]}{"crd/"}{.metadata.name}{"\n"}{end}' | grep 'nodemaintenance.medik8s' | sed -z 's/\n/ /g')
-named_resources+=(${NMO_CRD})
+named_resources+=("${NMO_CRD}")
 
 # NMO's running POD name
-NMO_PODS=($(oc get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' -n ${NMO_NAMESPACE}  | grep 'node-maintenance'))
+NMO_PODS=("$(oc get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' -n "${NMO_NAMESPACE}"  | grep 'node-maintenance')")
 
 # Node Maintenance CRs
 group_resources+=(nm)
@@ -44,9 +44,10 @@ group_resources_text=$(IFS=, ; echo "${group_resources[*]}")
 oc adm inspect --dest-dir must-gather --all-namespaces "${group_resources_text}"
 
 # Get pod's logs for only the running pods. Dismiss drained NMO pods
-for NMO_POD_NAME in ${NMO_PODS[@]}; 
-do  if  [ $(oc get pod ${NMO_POD_NAME} -n ${NMO_NAMESPACE} -o jsonpath='{.status.phase}') == "Running" ];
-then oc logs ${NMO_POD_NAME} -n ${NMO_NAMESPACE} > must-gather/operator-pod-logs/${NMO_POD_NAME}; fi; done
+for NMO_POD_NAME in "${NMO_PODS[@]}"; 
+do  POD_PHASE="$(oc get pod "${NMO_POD_NAME}" -n "${NMO_NAMESPACE}" -o jsonpath='{.status.phase}')"
+if  [ "${POD_PHASE}" == "Running" ];
+then oc logs "${NMO_POD_NAME}" -n "${NMO_NAMESPACE}" > must-gather/operator-pod-logs/"${NMO_POD_NAME}"; fi; done
 
 # Get cluster's resource (CPU and Memory) usage 
 oc adm top node --use-protocol-buffers > must-gather/cluster_resoruce_statistics
