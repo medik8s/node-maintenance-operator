@@ -424,3 +424,15 @@ container-build-and-push-community: container-build-community container-push ## 
 .PHONY: cluster-functest 
 cluster-functest: ginkgo ## Run e2e tests in a real cluster
 	./hack/functest.sh $(GINKGO_VERSION)
+
+.PHONY: super-linter
+super-linter: ## Runs super linter locally (Supported Linters -> https://github.com/super-linter/super-linter#supported-linters
+	docker run --rm \
+		-e RUN_LOCAL=true \
+		-e USE_FIND_ALGORITHM=true \
+		-e IGNORE_GITIGNORED_FILES=true \		
+		-e LOG_LEVEL=NOTICE \
+		-e FILTER_REGEX_EXCLUDE="/vendor/|/bin/" \
+		-v $$(pwd):/tmp/lint \
+		-w /tmp/lint \
+		github/super-linter:v5
