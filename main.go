@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -32,6 +33,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -85,15 +87,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	if namespace, found := os.LookupEnv("OPERATOR_NAMESPACE"); found {
-		controllers.SetLeaseNamespace(namespace)
+	cl := mgr.GetClient()
+	leaseManagerInitializer := &leaseManagerInitializer{cl: cl}
+	if err := mgr.Add(leaseManagerInitializer); err != nil {
+		setupLog.Error(err, "unable to set up lease Manager", "webhook", "NodeMaintenance")
+		os.Exit(1)
 	}
 
-	client := mgr.GetClient()
 	if err = (&controllers.NodeMaintenanceReconciler{
-		Client:       client,
+		Client:       cl,
 		Scheme:       mgr.GetScheme(),
-		LeaseManager: lease.NewManager(client, controllers.LeaseHolderIdentity, controllers.LeaseNamespace),
+		LeaseManager: leaseManagerInitializer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeMaintenance")
 		os.Exit(1)
@@ -126,4 +130,15 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Operator Version: %s", version.Version))
 	setupLog.Info(fmt.Sprintf("Git Commit: %s", version.GitCommit))
 	setupLog.Info(fmt.Sprintf("Build Date: %s", version.BuildDate))
+}
+
+type leaseManagerInitializer struct {
+	cl client.Client
+	lease.Manager
+}
+
+func (ls *leaseManagerInitializer) Start(context.Context) error {
+	var err error
+	ls.Manager, err = lease.NewManager(ls.cl, controllers.LeaseHolderIdentity)
+	return err
 }

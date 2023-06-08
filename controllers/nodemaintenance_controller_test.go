@@ -67,10 +67,11 @@ var _ = Describe("Node Maintenance", func() {
 
 		// Create a ReconcileNodeMaintenance object with the scheme and fake client
 		// TODO add reconciler to manager in suite_test.go and don't call reconcile funcs manually
+		manager, _ := lease.NewManager(k8sClient, "")
 		r = &NodeMaintenanceReconciler{
 			Client:       k8sClient,
 			Scheme:       scheme.Scheme,
-			LeaseManager: &mockLeaseManager{lease.NewManager(k8sClient, "", "")},
+			LeaseManager: &mockLeaseManager{manager},
 			logger:       ctrl.Log.WithName("unit test"),
 		}
 		_ = initDrainer(r, cfg)

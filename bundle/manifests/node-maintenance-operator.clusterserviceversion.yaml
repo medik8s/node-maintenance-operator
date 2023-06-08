@@ -93,6 +93,7 @@ spec:
           resources:
           - namespaces
           verbs:
+          - create
           - get
         - apiGroups:
           - ""

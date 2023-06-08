@@ -3,20 +3,28 @@ package lease
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	coordv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	//NSEnvVar is containing the value of the namespace leases will be managed at, in case it's empty defaultLeaseNs will be used
+	NSEnvVar       = "LEASE_NAMESPACE"
+	defaultLeaseNs = "medik8s-leases"
 )
 
 type Manager interface {
@@ -49,18 +57,55 @@ func (l *manager) InvalidateLease(ctx context.Context, obj client.Object) error 
 	return l.invalidateLease(ctx, obj)
 }
 
-func NewManager(cl client.Client, holderIdentity string, namespace string) Manager {
-	return NewManagerWithCustomLogger(cl, holderIdentity, namespace, ctrl.Log.WithName("leaseManager"))
+func NewManager(cl client.Client, holderIdentity string) (Manager, error) {
+	return NewManagerWithCustomLogger(cl, holderIdentity, ctrl.Log.WithName("leaseManager"))
 
 }
 
-func NewManagerWithCustomLogger(cl client.Client, holderIdentity string, namespace string, log logr.Logger) Manager {
+func setupLeaseNs(cl client.Client, log logr.Logger, leaseNsName string) error {
+	ns := &v1.Namespace{}
+	key := apitypes.NamespacedName{Name: leaseNsName}
+	if err := cl.Get(context.Background(), key, ns); err != nil {
+		if !apierrors.IsNotFound(err) {
+			log.Error(err, "couldn't get lease namespace", "namespace", leaseNsName)
+			return errors.Wrap(err, "couldn't get lease namespace")
+		}
+		if err := createLeaseNs(cl, leaseNsName); err != nil {
+			log.Error(err, "couldn't create lease namespace", "namespace", leaseNsName)
+			return errors.Wrap(err, "couldn't create lease namespace")
+		}
+	}
+	return nil
+}
+
+func getLeaseNsName() string {
+	leaseNsName := defaultLeaseNs
+	if leaseNsOverride, ok := os.LookupEnv(NSEnvVar); ok {
+		leaseNsName = leaseNsOverride
+	}
+	return leaseNsName
+}
+
+func createLeaseNs(cl client.Client, leaseNsName string) error {
+	ns := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: leaseNsName,
+		},
+	}
+	return cl.Create(context.Background(), ns)
+}
+
+func NewManagerWithCustomLogger(cl client.Client, holderIdentity string, log logr.Logger) (Manager, error) {
+	leaseNsName := getLeaseNsName()
+	if err := setupLeaseNs(cl, log, leaseNsName); err != nil {
+		return nil, err
+	}
 	return &manager{
 		Client:         cl,
 		holderIdentity: holderIdentity,
-		namespace:      namespace,
+		namespace:      leaseNsName,
 		log:            log,
-	}
+	}, nil
 }
 
 func (l *manager) createLease(ctx context.Context, obj client.Object, duration time.Duration) error {
@@ -157,7 +202,7 @@ func (l *manager) invalidateLease(ctx context.Context, obj client.Object) error 
 	log.Info("invalidating lease")
 	lease, err := l.getLease(ctx, obj)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return nil
 		}
 		return err
@@ -231,7 +276,7 @@ func (l *manager) getLease(ctx context.Context, obj client.Object) (*coordv1.Lea
 	lease := &coordv1.Lease{}
 
 	if err := l.Client.Get(ctx, nName, lease); err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			l.log.Error(err, "couldn't fetch lease")
 		}
 		return nil, err
