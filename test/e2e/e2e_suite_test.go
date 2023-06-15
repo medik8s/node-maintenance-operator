@@ -41,6 +41,8 @@ var (
 	// The ns for test deployments
 	testNsName    string
 	testNamespace *corev1.Namespace
+	//namespace leases are created in
+	leaseNs = "medik8s-leases"
 )
 
 var _ = BeforeSuite(func() {

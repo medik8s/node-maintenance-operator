@@ -49,14 +49,9 @@ const (
 	FixedDurationReconcileLog         = "Reconciling with fixed duration"
 
 	//lease consts
-	leaseNamespaceDefault = "node-maintenance"
-	LeaseHolderIdentity   = "node-maintenance"
-	LeaseDuration         = 3600 * time.Second
-	DrainerTimeout        = 30 * time.Second
-)
-
-var (
-	LeaseNamespace = leaseNamespaceDefault
+	LeaseHolderIdentity = "node-maintenance"
+	LeaseDuration       = 3600 * time.Second
+	DrainerTimeout      = 30 * time.Second
 )
 
 // NodeMaintenanceReconciler reconciles a NodeMaintenance object
@@ -76,7 +71,7 @@ type NodeMaintenanceReconciler struct {
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;update;patch;watch
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=pods/eviction,verbs=create
-//+kubebuilder:rbac:groups="",resources=namespaces,verbs=get
+//+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;create
 //+kubebuilder:rbac:groups="apps",resources=deployments;daemonsets;replicasets;statefulsets,verbs=get;list;watch
 //+kubebuilder:rbac:groups="coordination.k8s.io",resources=leases,verbs=get;list;update;patch;watch;create
 //+kubebuilder:rbac:groups="policy",resources=poddisruptionbudgets,verbs=get;list;watch
@@ -238,10 +233,6 @@ func onPodDeletedOrEvicted(pod *corev1.Pod, usingEviction bool) {
 	}
 	msg := fmt.Sprintf("pod: %s:%s %s from node: %s", pod.ObjectMeta.Namespace, pod.ObjectMeta.Name, verbString, pod.Spec.NodeName)
 	klog.Info(msg)
-}
-
-func SetLeaseNamespace(namespace string) {
-	LeaseNamespace = namespace
 }
 
 func initDrainer(r *NodeMaintenanceReconciler, config *rest.Config) error {

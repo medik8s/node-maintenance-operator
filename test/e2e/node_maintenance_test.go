@@ -461,7 +461,7 @@ func isTainted(node *corev1.Node) bool {
 func hasValidLease(nodeName string, startTime time.Time) {
 	Eventually(func(g Gomega) {
 		lease := &coordv1.Lease{}
-		err := Client.Get(context.TODO(), types.NamespacedName{Namespace: operatorNsName, Name: fmt.Sprintf("node-%s", nodeName)}, lease)
+		err := Client.Get(context.TODO(), types.NamespacedName{Namespace: leaseNs, Name: fmt.Sprintf("node-%s", nodeName)}, lease)
 		g.ExpectWithOffset(1, err).ToNot(HaveOccurred(), "failed to get lease")
 
 		g.ExpectWithOffset(1, *lease.Spec.LeaseDurationSeconds).To(Equal(int32(nodemaintenance.LeaseDuration.Seconds())))
@@ -481,6 +481,6 @@ func hasValidLease(nodeName string, startTime time.Time) {
 
 func isLeaseInvalidated(nodeName string) {
 	lease := &coordv1.Lease{}
-	err := Client.Get(context.TODO(), types.NamespacedName{Namespace: operatorNsName, Name: fmt.Sprintf("node-%s", nodeName)}, lease)
+	err := Client.Get(context.TODO(), types.NamespacedName{Namespace: leaseNs, Name: fmt.Sprintf("node-%s", nodeName)}, lease)
 	Expect(apierrors.IsNotFound(err)).To(BeTrue())
 }
