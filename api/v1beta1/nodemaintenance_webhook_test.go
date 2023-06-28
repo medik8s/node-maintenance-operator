@@ -196,7 +196,7 @@ func getTestNode(name string, isControlPlane bool) *v1.Node {
 	}
 	if isControlPlane {
 		node.ObjectMeta.Labels = map[string]string{
-			LabelNameRoleControlPlane: "",
+			"node-role.kubernetes.io/control-plane": "",
 		}
 	}
 	return node
