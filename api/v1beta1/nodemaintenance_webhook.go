@@ -22,6 +22,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/medik8s/common/pkg/nodes"
+
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -41,11 +43,9 @@ const (
 )
 
 const (
-	EtcdQuorumPDBNewName      = "etcd-guard-pdb"    // The new name of the PDB - From OCP 4.11
-	EtcdQuorumPDBOldName      = "etcd-quorum-guard" // The old name of the PDB - Up to OCP 4.10
-	EtcdQuorumPDBNamespace    = "openshift-etcd"
-	LabelNameRoleMaster       = "node-role.kubernetes.io/master"
-	LabelNameRoleControlPlane = "node-role.kubernetes.io/control-plane"
+	EtcdQuorumPDBNewName   = "etcd-guard-pdb"    // The new name of the PDB - From OCP 4.11
+	EtcdQuorumPDBOldName   = "etcd-quorum-guard" // The old name of the PDB - Up to OCP 4.10
+	EtcdQuorumPDBNamespace = "openshift-etcd"
 )
 
 const (
@@ -193,7 +193,7 @@ func (v *NodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) e
 	} else if node == nil {
 		// this should have been catched already, but just in case
 		return fmt.Errorf(ErrorNodeNotExists, nodeName)
-	} else if !isControlPlaneNode(node) {
+	} else if !nodes.IsControlPlane(node) {
 		// not a control-plane node, nothing to do
 		return nil
 	}
@@ -240,14 +240,4 @@ func getNode(nodeName string, client client.Client) (*v1.Node, error) {
 		return nil, fmt.Errorf("could not get node: %v", err)
 	}
 	return &node, nil
-}
-
-func isControlPlaneNode(node *v1.Node) bool {
-	if _, ok := node.Labels[LabelNameRoleMaster]; ok {
-		return true
-	}
-	if _, ok := node.Labels[LabelNameRoleControlPlane]; ok {
-		return true
-	}
-	return false
 }
