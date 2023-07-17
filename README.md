@@ -8,8 +8,9 @@ The node-maintenance-operator (**NMO**) is an operator generated from the [opera
 NMO was *previously* developed under [KubeVirt](https://github.com/kubevirt/node-maintenance-operator), and this repository is the up-to-date version of NMO.
 
 The purpose of this operator is to watch for new or deleted custom resources (CRs) called `NodeMaintenance` which indicate that a node in the cluster should either:
-  - `NodeMaintenance` CR created: move node into maintenance, cordon the node - set it as unschedulable, and evict the pods (which can be evicted) from that node.
-  - `NodeMaintenance` CR deleted: remove pod from maintenance and uncordon the node - set it as schedulable.
+
+- `NodeMaintenance` CR created: move node into maintenance, cordon the node - set it as unschedulable, and evict the pods (which can be evicted) from that node.
+- `NodeMaintenance` CR deleted: remove pod from maintenance and uncordon the node - set it as schedulable.
 
 > *Note*:  The current behavior of the operator is to mimic `kubectl drain <node name>`.
 
@@ -27,16 +28,18 @@ After every PR merge to `main` branch images were build and pushed to `quay.io`.
 For deployment of NMO using these images you need:
 
 - a running OpenShift cluster, or a Kubernetes cluster with Operator Lifecycle Manager (OLM) installed.
-- `operator-sdk` binary installed, see https://sdk.operatorframework.io/docs/installation/.
+- `operator-sdk` binary installed, see <https://sdk.operatorframework.io/docs/installation/>.
 - a valid `$KUBECONFIG` configured to access your cluster.
 
 Then run `operator-sdk run bundle quay.io/medik8s/node-maintenance-operator-bundle:latest`
 
 ### Deploy the last release version
-Click on `Install` in the Node Maintenance Operator page under [OperatorHub.io](https://operatorhub.io/operator/node-maintenance-operator), 
+
+Click on `Install` in the Node Maintenance Operator page under [OperatorHub.io](https://operatorhub.io/operator/node-maintenance-operator),
 and follow its instructions to install the [Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/), and the operator.
 
 ### Build and deploy from sources
+
 Follow the instructions [here](https://sdk.operatorframework.io/docs/building-operators/golang/tutorial/#3-deploy-your-operator-with-olm) for deploying the operator with OLM.
 > *Note*: Webhook cannot run using `make deploy`, because the volume mount of the webserver certificate is not found.
 
@@ -46,6 +49,7 @@ Follow the instructions [here](https://sdk.operatorframework.io/docs/building-op
 
 To set maintenance on a node a `NodeMaintenance` custom resource should be created.
 The `NodeMaintenance` CR spec contains:
+
 - nodeName: The name of the node which will be put into maintenance mode.
 - reason: The reason why the node will be under maintenance.
 
@@ -70,6 +74,7 @@ time="2022-02-24T11:58:20Z" level=info msg="Maintenance taints will be added to 
 time="2022-02-24T11:58:20Z" level=info msg="Applying medik8s.io/drain taint add on Node: node02"
 time="2022-02-24T11:58:20Z" level=info msg="Patching taints on Node: node02"
 2022-02-23T07:33:59.336Z INFO controller-runtime.manager.controller.nodemaintenance Evict all Pods from Node {"reconciler group": "nodemaintenance.medik8s.io", "reconciler kind": "NodeMaintenance", "name": "nodemaintenance-sample", "namespace": "", "nodeName": "node02"}
+<!-- markdownlint-disable-next-line MD013 -->
 E0223 07:33:59.498801 1 nodemaintenance_controller.go:449] WARNING: ignoring DaemonSet-managed Pods: openshift-cluster-node-tuning-operator/tuned-jrprj, openshift-dns/dns-default-kf6jj, openshift-dns/node-resolver-72jzb, openshift-image-registry/node-ca-czgc6, openshift-ingress-canary/ingress-canary-44tgv, openshift-machine-config-operator/machine-config-daemon-csv6c, openshift-monitoring/node-exporter-rzwhz, openshift-multus/multus-additional-cni-plugins-829bh, openshift-multus/multus-qwfc9, openshift-multus/network-metrics-daemon-pxt6n, openshift-network-diagnostics/network-check-target-qqcbr, openshift-sdn/sdn-s5cqx; deleting Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet: openshift-marketplace/nmo-downstream-8-8nms7
 I0223 07:33:59.500418 1 nodemaintenance_controller.go:449] evicting pod openshift-network-diagnostics/network-check-source-865d4b5578-n2cxg
 I0223 07:33:59.500790 1 nodemaintenance_controller.go:449] evicting pod openshift-ingress/router-default-7548cf6fb5-rgxrq
@@ -134,6 +139,7 @@ The phase is updated for each processing attempt on the CR.
 `totalPods` is the total number of pods, before the node entered maintenance mode.
 
 ## Debug
+
 ### Collecting cluster data with must-gather
 
 Use NMO's must-gather from [here](https://github.com/medik8s/node-maintenance-operator/tree/main/must-gather) to collect related debug data.
@@ -155,16 +161,16 @@ Use NMO's must-gather from [here](https://github.com/medik8s/node-maintenance-op
 
 For new minor releases:
 
-  - create and push the `release-0.y` branch.
-  - update OpenshiftCI with new branches!
+- create and push the `release-0.y` branch.
+- update OpenshiftCI with new branches!
 
 For every major / minor / patch release:
 
-  - create and push the `vx.y.z` tag.
-  - this should trigger CI to build and push new images
+- create and push the `vx.y.z` tag.
+- this should trigger CI to build and push new images
   - if it fails, the manual fallback is `VERSION=x.y.z make container-build-and-push-community`
-  - make the git tag a release in the GitHub UI.
+- make the git tag a release in the GitHub UI.
 
 ## Help
 
-Feel free to join our Google group to get more info - https://groups.google.com/g/medik8s
+Feel free to join our Google group to get more info - <https://groups.google.com/g/medik8s>

@@ -182,11 +182,11 @@ fix-imports: sort-imports ## Sort imports
 	$(SORT_IMPORTS) -w .
 
 .PHONY: test
-test: test-no-verify verify-unchanged ## Generate and format code, run tests, generate manifests and bundle, and verify no uncommitted changes
-
-.PHONY: test-no-verify
-test-no-verify: manifests generate go-verify test-imports fmt vet envtest ginkgo ## Generate and format code, and run tests
+test: manifests generate envtest ginkgo ## Generate code, and run unit tests
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -r --keep-going  --require-suite --vv ./api/... ./controllers/... --coverprofile cover.out
+
+.PHONY: lint
+lint: manifests generate go-verify fix-imports fmt vet super-linter verify-unchanged ## Generate and format code, fix the imports, verify unmodified files and run super-linter
 
 .PHONY: bundle-run
 export BUNDLE_RUN_NAMESPACE ?= openshift-operators
@@ -395,8 +395,8 @@ catalog-push: ## Push a catalog image.
 ##@ Targets used by CI
 
 .PHONY: check 
-check: ## Dockerized version of make test-no-verify
-	$(DOCKER_GO) "make test-no-verify"
+check: ## Dockerized version of make test
+	$(DOCKER_GO) "make test"
 
 .PHONY: verify-unchanged
 verify-unchanged: ## Verify there are no un-committed changes
@@ -424,3 +424,15 @@ container-build-and-push-community: container-build-community container-push ## 
 .PHONY: cluster-functest 
 cluster-functest: ginkgo ## Run e2e tests in a real cluster
 	./hack/functest.sh $(GINKGO_VERSION)
+
+.PHONY: super-linter
+super-linter: ## Runs super linter locally (Supported Linters -> https://github.com/super-linter/super-linter#supported-linters
+	docker run --rm \
+		-e RUN_LOCAL=true \
+		-e USE_FIND_ALGORITHM=true \
+		-e IGNORE_GITIGNORED_FILES=true \
+		-e LOG_LEVEL=NOTICE \
+		-e FILTER_REGEX_EXCLUDE="/vendor/|/bin/" \
+		-v $$(pwd):/tmp/lint \
+		-w /tmp/lint \
+		github/super-linter:slim-v5
