@@ -9,7 +9,7 @@ require (
 	github.com/onsi/gomega v1.27.8
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.26.3
-	k8s.io/apimachinery v0.26.3
+	k8s.io/apimachinery v0.26.10-0.20231013031804-4eaec8069337
 	k8s.io/client-go v0.26.3
 	k8s.io/klog v1.0.0
 	k8s.io/kubectl v0.26.0
@@ -45,7 +45,7 @@ require (
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.1.2 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
