@@ -19,8 +19,6 @@ package v1beta1
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -48,12 +46,6 @@ const (
 	LabelNameRoleControlPlane = "node-role.kubernetes.io/control-plane"
 )
 
-const (
-	WebhookCertDir  = "/apiserver.local.config/certificates"
-	WebhookCertName = "apiserver.crt"
-	WebhookKeyName  = "apiserver.key"
-)
-
 // log is for logging in this package.
 var nodemaintenancelog = logf.Log.WithName("nodemaintenance-resource")
 
@@ -71,24 +63,6 @@ func (r *NodeMaintenance) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	// init the validator!
 	validator = &NodeMaintenanceValidator{
 		client: mgr.GetClient(),
-	}
-
-	// check if OLM injected certs
-	certs := []string{filepath.Join(WebhookCertDir, WebhookCertName), filepath.Join(WebhookCertDir, WebhookKeyName)}
-	certsInjected := true
-	for _, fname := range certs {
-		if _, err := os.Stat(fname); err != nil {
-			certsInjected = false
-			break
-		}
-	}
-	if certsInjected {
-		server := mgr.GetWebhookServer()
-		server.CertDir = WebhookCertDir
-		server.CertName = WebhookCertName
-		server.KeyName = WebhookKeyName
-	} else {
-		nodemaintenancelog.Info("OLM injected certs for webhooks not found")
 	}
 
 	return ctrl.NewWebhookManagedBy(mgr).
