@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/medik8s/common/pkg/labels"
 	"github.com/medik8s/common/pkg/lease"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -233,6 +234,23 @@ var _ = Describe("Node Maintenance", func() {
 			Expect(err).NotTo(HaveOccurred())
 			reconcileMaintenance(nm)
 			checkFailedReconcile()
+		})
+
+		It("add/remove Exclude remediation label", func() {
+			reconcileMaintenance(nm)
+			checkSuccesfulReconcile()
+			node := &corev1.Node{}
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: nm.Spec.NodeName}, node)
+			Expect(err).NotTo(HaveOccurred())
+			//Label added on CR creation
+			Expect(node.Labels[labels.ExcludeFromRemediation]).To(Equal("true"))
+
+			Expect(k8sClient.Delete(context.Background(), nm)).To(Succeed())
+			reconcileMaintenance(nm)
+			//Re-fetch node after reconcile
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKey{Name: nm.Spec.NodeName}, node)).NotTo(HaveOccurred())
+			_, exist := node.Labels[labels.ExcludeFromRemediation]
+			Expect(exist).To(BeFalse())
 		})
 
 	})

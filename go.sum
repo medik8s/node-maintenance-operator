@@ -231,8 +231,8 @@ github.com/mailru/easyjson v0.7.6/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJ
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/matttproud/golang_protobuf_extensions v1.0.2 h1:hAHbPm5IJGijwng3PWk09JkG9WeqChjprR5s9bBZ+OM=
 github.com/matttproud/golang_protobuf_extensions v1.0.2/go.mod h1:BSXmuO+STAnVfrANrmjBb36TMTDstsz7MSK+HVaYKv4=
-github.com/medik8s/common v1.2.0 h1:xgQOijD3rEn+PfCd4lJuV3WFdt5QA6SIaqF01rRp2as=
-github.com/medik8s/common v1.2.0/go.mod h1:ZT/3hfMXJLmZEcqmxRWB5LGC8Wl+qKGGQ4zM8hOE7PY=
+github.com/medik8s/common v1.11.0 h1:uw00Ej2aeRXG81zjfw9V69KRTyF47vBlSiV6eu8JipM=
+github.com/medik8s/common v1.11.0/go.mod h1:ZT/3hfMXJLmZEcqmxRWB5LGC8Wl+qKGGQ4zM8hOE7PY=
 github.com/mitchellh/go-wordwrap v1.0.0 h1:6GlHJ/LTGMrIJbwgdqdl2eEH8o+Exx/0m8ir9Gns0u4=
 github.com/mitchellh/go-wordwrap v1.0.0/go.mod h1:ZXFpozHsX6DPmq2I0TCekCxypsnAUbP2oI0UX1GXzOo=
 github.com/moby/spdystream v0.2.0 h1:cjW1zVyyoiM0T7b6UoySUFqzXMoqRckQtXwGPiBhOM8=

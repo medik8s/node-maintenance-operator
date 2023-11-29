@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/medik8s/common/pkg/labels"
 	"github.com/medik8s/common/pkg/lease"
 
 	corev1 "k8s.io/api/core/v1"
@@ -175,7 +176,12 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if instance.Status.Phase != nodemaintenancev1beta1.MaintenanceRunning || instance.Status.ErrorOnLeaseCount != 0 {
 			instance.Status.Phase = nodemaintenancev1beta1.MaintenanceRunning
 			instance.Status.ErrorOnLeaseCount = 0
+
 		}
+	}
+	//Add exclude from remediation label
+	if err := r.addExcludeRemediationLabel(ctx, node); err != nil {
+		return r.onReconcileError(instance, err)
 	}
 
 	// Cordon node
@@ -313,6 +319,35 @@ func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error)
 
 	return false, nil
 }
+
+func (r *NodeMaintenanceReconciler) addExcludeRemediationLabel(ctx context.Context, node *corev1.Node) error {
+	if node.Labels[labels.ExcludeFromRemediation] != "true" {
+		patch := client.MergeFrom(node.DeepCopy())
+		if node.Labels == nil {
+			node.Labels = map[string]string{labels.ExcludeFromRemediation: "true"}
+		} else if node.Labels[labels.ExcludeFromRemediation] != "true" {
+			node.Labels[labels.ExcludeFromRemediation] = "true"
+		}
+		if err := r.Client.Patch(ctx, node, patch); err != nil {
+			r.logger.Error(err, "Failed to add exclude from remediation label from the node", "node name", node.Name)
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *NodeMaintenanceReconciler) removeExcludeRemediationLabel(ctx context.Context, node *corev1.Node) error {
+	if node.Labels[labels.ExcludeFromRemediation] == "true" {
+		patch := client.MergeFrom(node.DeepCopy())
+		delete(node.Labels, labels.ExcludeFromRemediation)
+		if err := r.Client.Patch(ctx, node, patch); err != nil {
+			r.logger.Error(err, "Failed to remove exclude from remediation label from the node", "node name", node.Name)
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, node *corev1.Node) error {
 	// Uncordon the node
 	err := AddOrRemoveTaint(r.drainer.Client, node, false)
@@ -327,8 +362,7 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, 
 	if err := r.LeaseManager.InvalidateLease(ctx, node); err != nil {
 		return err
 	}
-
-	return nil
+	return r.removeExcludeRemediationLabel(ctx, node)
 }
 
 func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Context, nodeName string) error {
@@ -339,7 +373,7 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Co
 			if err := r.LeaseManager.InvalidateLease(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}); err != nil {
 				return err
 			}
-			return nil
+			return r.removeExcludeRemediationLabel(ctx, node)
 		}
 		return err
 	}
