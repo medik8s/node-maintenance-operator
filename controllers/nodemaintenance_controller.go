@@ -373,7 +373,7 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Co
 			if err := r.LeaseManager.InvalidateLease(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}); err != nil {
 				return err
 			}
-			return r.removeExcludeRemediationLabel(ctx, node)
+			return nil
 		}
 		return err
 	}
