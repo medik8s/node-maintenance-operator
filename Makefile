@@ -47,6 +47,7 @@ export DEFAULT_CHANNEL
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= $(DEFAULT_VERSION)
+PREVIOUS_VERSION ?= $(DEFAULT_VERSION)
 export VERSION
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -199,11 +200,19 @@ DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ./config/assets/nmo_blue_icon.png
 export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
 
 .PHONY: bundle-update
-bundle-update: ## Update containerImage, createdAt, and icon fields in the bundle's CSV
+bundle-update: verify-previous-version ## Update CSV fields and validate the bundle directory
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+	sed -r -i "s|replaces: .*|replaces: self-node-remediation.v${PREVIOUS_VERSION}|;" ${BUNDLE_CSV}
 	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 	$(MAKE) bundle-validate
+
+.PHONY: verify-previous-version
+verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
+	@if [ $(VERSION) != $(DEFAULT_VERSION) ] && [ $(PREVIOUS_VERSION) = $(DEFAULT_VERSION) ]; then \
+  			echo "Error: PREVIOUS_VERSION must be set for the selected VERSION"; \
+    		exit 1; \
+    fi
 
 .PHONY: bundle-reset-date
 bundle-reset-date: ## Reset bundle's createdAt
