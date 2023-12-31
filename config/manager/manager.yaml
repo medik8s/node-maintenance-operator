@@ -26,19 +26,39 @@ spec:
     spec:
       affinity:
         nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 3
+              preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/infra
+                    operator: In
+                    values: 
+                    - reserved
+            - weight: 1
+              preference:
+                matchExpressions:
                   - key: node-role.kubernetes.io/master
-                    operator: Exists
-              - matchExpressions:
+                    operator: In
+            - weight: 1
+              preference:
+                matchExpressions:
                   - key: node-role.kubernetes.io/control-plane
-                    operator: Exists
+                    operator: In
       tolerations:
         - effect: NoSchedule
           key: node-role.kubernetes.io/master
+          operator: Exists
         - effect: NoSchedule
           key: node-role.kubernetes.io/control-plane
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/infra
+          operator: Exists
+          value: reserved
+        - effect: NoExecute
+          key: node-role.kubernetes.io/infra
+          operator: Exists
+          value: reserved
       securityContext:
         runAsNonRoot: true
       priorityClassName: system-cluster-critical
