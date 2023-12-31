@@ -101,4 +101,5 @@ spec:
   provider:
     name: Medik8s
     url: https://github.com/medik8s
+  replaces: node-maintenance-operator.v0.0.1
   version: 0.0.0
