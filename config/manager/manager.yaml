@@ -31,19 +31,17 @@ spec:
               preference:
                 matchExpressions:
                   - key: node-role.kubernetes.io/infra
-                    operator: In
-                    values: 
-                    - reserved
+                    operator: Exists
             - weight: 1
               preference:
                 matchExpressions:
                   - key: node-role.kubernetes.io/master
-                    operator: In
+                    operator: Exists
             - weight: 1
               preference:
                 matchExpressions:
                   - key: node-role.kubernetes.io/control-plane
-                    operator: In
+                    operator: Exists
       tolerations:
         - effect: NoSchedule
           key: node-role.kubernetes.io/master
@@ -54,11 +52,9 @@ spec:
         - effect: NoSchedule
           key: node-role.kubernetes.io/infra
           operator: Exists
-          value: reserved
         - effect: NoExecute
           key: node-role.kubernetes.io/infra
           operator: Exists
-          value: reserved
       securityContext:
         runAsNonRoot: true
       priorityClassName: system-cluster-critical
