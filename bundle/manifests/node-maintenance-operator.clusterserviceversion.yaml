@@ -225,14 +225,22 @@ spec:
             spec:
               affinity:
                 nodeAffinity:
-                  requiredDuringSchedulingIgnoredDuringExecution:
-                    nodeSelectorTerms:
-                    - matchExpressions:
+                  preferredDuringSchedulingIgnoredDuringExecution:
+                  - preference:
+                      matchExpressions:
+                      - key: node-role.kubernetes.io/infra
+                        operator: Exists
+                    weight: 3
+                  - preference:
+                      matchExpressions:
                       - key: node-role.kubernetes.io/master
                         operator: Exists
-                    - matchExpressions:
+                    weight: 1
+                  - preference:
+                      matchExpressions:
                       - key: node-role.kubernetes.io/control-plane
                         operator: Exists
+                    weight: 1
               containers:
               - args:
                 - --health-probe-bind-address=:8081
@@ -283,8 +291,16 @@ spec:
               tolerations:
               - effect: NoSchedule
                 key: node-role.kubernetes.io/master
+                operator: Exists
               - effect: NoSchedule
                 key: node-role.kubernetes.io/control-plane
+                operator: Exists
+              - effect: NoSchedule
+                key: node-role.kubernetes.io/infra
+                operator: Exists
+              - effect: NoExecute
+                key: node-role.kubernetes.io/infra
+                operator: Exists
       permissions:
       - rules:
         - apiGroups:
