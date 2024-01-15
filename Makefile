@@ -70,6 +70,7 @@ endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 OPERATOR_NAME ?= node-maintenance-operator
+OPERATOR_NAMESPACE ?= openshift-workload-availability
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
@@ -190,8 +191,8 @@ test-no-verify: manifests generate go-verify test-imports fmt vet envtest ginkgo
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -r --keep-going  --require-suite --vv ./api/... ./controllers/... --coverprofile cover.out
 
 .PHONY: bundle-run
-bundle-run: operator-sdk ## Run bundle image. Default NS is "openshift-operators", redefine BUNDLE_RUN_NAMESPACE to override it.
-	$(OPERATOR_SDK) -n $(BUNDLE_RUN_NAMESPACE) run bundle $(BUNDLE_IMG)
+bundle-run: operator-sdk ## Run bundle image. Default NS is "openshift-workload-availability", redefine OPERATOR_NAMESPACE to override it.
+	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) run bundle $(BUNDLE_IMG)
 
 ##@ Bundle Creation Addition
 ## Some addition to bundle creation in the bundle
