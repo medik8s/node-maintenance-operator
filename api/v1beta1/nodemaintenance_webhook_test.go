@@ -37,7 +37,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 
 			It("should be rejected", func() {
 				nm := getTestNMO(nonExistingNodeName)
-				err := nm.ValidateCreate()
+				_, err := nm.ValidateCreate()
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(ErrorNodeNotExists, nonExistingNodeName))
 			})
@@ -71,7 +71,8 @@ var _ = Describe("NodeMaintenance Validation", func() {
 			It("should be rejected", func() {
 				nm := getTestNMO(existingNodeName)
 				Eventually(func() error {
-					return nm.ValidateCreate()
+					_, err := nm.ValidateCreate()
+					return err
 				}, time.Second, 200*time.Millisecond).Should(And(
 					HaveOccurred(),
 					WithTransform(func(err error) string { return err.Error() }, ContainSubstring(ErrorNodeMaintenanceExists, existingNodeName)),
@@ -112,7 +113,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 
 				It("should be rejected", func() {
 					nm := getTestNMO(existingNodeName)
-					err := nm.ValidateCreate()
+					_, err := nm.ValidateCreate()
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring(ErrorControlPlaneQuorumViolation))
 				})
@@ -141,7 +142,8 @@ var _ = Describe("NodeMaintenance Validation", func() {
 				It("should not be rejected", func() {
 					nm := getTestNMO(existingNodeName)
 					Eventually(func() error {
-						return nm.ValidateCreate()
+						_, err := nm.ValidateCreate()
+						return err
 					}, time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
 				})
 
@@ -152,7 +154,8 @@ var _ = Describe("NodeMaintenance Validation", func() {
 				It("should not be rejected", func() {
 					nm := getTestNMO(existingNodeName)
 					Eventually(func() error {
-						return nm.ValidateCreate()
+						_, err := nm.ValidateCreate()
+						return err
 					}, time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
 				})
 
@@ -168,7 +171,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 			It("should be rejected", func() {
 				nmOld := getTestNMO(existingNodeName)
 				nm := getTestNMO("newNodeName")
-				err := nm.ValidateUpdate(nmOld)
+				_, err := nm.ValidateUpdate(nmOld)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(ErrorNodeNameUpdateForbidden))
 			})

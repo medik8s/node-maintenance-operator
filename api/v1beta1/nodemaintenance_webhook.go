@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 const (
@@ -76,33 +77,33 @@ func (r *NodeMaintenance) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &NodeMaintenance{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *NodeMaintenance) ValidateCreate() error {
+func (r *NodeMaintenance) ValidateCreate() (admission.Warnings, error) {
 	nodemaintenancelog.Info("validate create", "name", r.Name)
 
 	if validator == nil {
-		return fmt.Errorf("nodemaintenance validator isn't initialized yet")
+		return nil, fmt.Errorf("nodemaintenance validator isn't initialized yet")
 	}
-	return validator.ValidateCreate(r)
+	return nil, validator.ValidateCreate(r)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *NodeMaintenance) ValidateUpdate(old runtime.Object) error {
+func (r *NodeMaintenance) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	nodemaintenancelog.Info("validate update", "name", r.Name)
 
 	if validator == nil {
-		return fmt.Errorf("nodemaintenance validator isn't initialized yet")
+		return nil, fmt.Errorf("nodemaintenance validator isn't initialized yet")
 	}
-	return validator.ValidateUpdate(r, old.(*NodeMaintenance))
+	return nil, validator.ValidateUpdate(r, old.(*NodeMaintenance))
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *NodeMaintenance) ValidateDelete() error {
+func (r *NodeMaintenance) ValidateDelete() (admission.Warnings, error) {
 	nodemaintenancelog.Info("validate delete", "name", r.Name)
 
 	if validator == nil {
-		return fmt.Errorf("nodemaintenance validator isn't initialized yet")
+		return nil, fmt.Errorf("nodemaintenance validator isn't initialized yet")
 	}
-	return nil
+	return nil, nil
 }
 
 func (v *NodeMaintenanceValidator) ValidateCreate(nm *NodeMaintenance) error {
