@@ -194,6 +194,10 @@ test-no-verify: manifests generate go-verify test-imports fmt vet envtest ginkgo
 bundle-run: operator-sdk ## Run bundle image. Default NS is "openshift-workload-availability", redefine OPERATOR_NAMESPACE to override it.
 	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) run bundle $(BUNDLE_IMG)
 
+.PHONY: bundle-cleanup
+bundle-cleanup: operator-sdk ## Remove bundle installed via bundle-run
+	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) cleanup $(OPERATOR_NAME)
+
 ##@ Bundle Creation Addition
 ## Some addition to bundle creation in the bundle
 DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ./config/assets/nmo_blue_icon.png)
