@@ -69,7 +69,8 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
-OPERATOR_NAME ?= node-maintenance
+OPERATOR_NAME ?= node-maintenance-operator
+OPERATOR_NAMESPACE ?= openshift-workload-availability
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
@@ -80,13 +81,13 @@ IMAGE_TAG_BASE ?= $(IMAGE_REGISTRY)/$(OPERATOR_NAME)
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-operator-bundle:$(IMAGE_TAG)
+BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(IMAGE_TAG)
 
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-operator-catalog:$(IMAGE_TAG)
+CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(IMAGE_TAG)
 
 # Image URL to use all building/pushing image targets
-IMG ?= $(IMAGE_TAG_BASE)-operator:$(IMAGE_TAG)
+IMG ?= $(IMAGE_TAG_BASE):$(IMAGE_TAG)
 
 MUST_GATHER_IMAGE ?= $(IMAGE_TAG_BASE)-must-gather:$(IMAGE_TAG)
 
@@ -119,8 +120,8 @@ SHELL = /usr/bin/env bash -o pipefail
 # -w /home/go/src/github.com/medik8s/node-maintenance-operator         = working dir
 # -e ...                                                        = some env vars, especially set cache to a user writable dir
 # --entrypoint /bin bash ... -c                                 = run bash -c on start; that means the actual command(s) need be wrapped in double quotes, see e.g. check target which will run: bash -c "make test"
-export DOCKER_GO=docker run --rm -v $$(pwd):/home/go/src/github.com/medik8s/$(OPERATOR_NAME)-operator \
-	-u $$(id -u) -w /home/go/src/github.com/medik8s/$(OPERATOR_NAME)-operator \
+export DOCKER_GO=docker run --rm -v $$(pwd):/home/go/src/github.com/medik8s/$(OPERATOR_NAME) \
+	-u $$(id -u) -w /home/go/src/github.com/medik8s/$(OPERATOR_NAME) \
 	-e "GOPATH=/go" -e "GOFLAGS=-mod=vendor" -e "XDG_CACHE_HOME=/tmp/.cache" \
 	-e "VERSION=$(VERSION)" -e "IMAGE_REGISTRY=$(IMAGE_REGISTRY)" \
 	--entrypoint /bin/bash golang:$(GO_VERSION) -c
@@ -190,21 +191,24 @@ test-no-verify: manifests generate go-verify test-imports fmt vet envtest ginkgo
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -r --keep-going  --require-suite --vv ./api/... ./controllers/... --coverprofile cover.out
 
 .PHONY: bundle-run
-export BUNDLE_RUN_NAMESPACE ?= openshift-operators
-bundle-run: operator-sdk ## Run bundle image. Default NS is "openshift-operators", redefine BUNDLE_RUN_NAMESPACE to override it.
-	$(OPERATOR_SDK) -n $(BUNDLE_RUN_NAMESPACE) run bundle $(BUNDLE_IMG)
+bundle-run: operator-sdk ## Run bundle image. Default NS is "openshift-workload-availability", redefine OPERATOR_NAMESPACE to override it.
+	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) run bundle $(BUNDLE_IMG)
+
+.PHONY: bundle-cleanup
+bundle-cleanup: operator-sdk ## Remove bundle installed via bundle-run
+	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) cleanup $(OPERATOR_NAME)
 
 ##@ Bundle Creation Addition
 ## Some addition to bundle creation in the bundle
 DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ./config/assets/nmo_blue_icon.png)
 export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
-export BUNDLE_CSV ?= "./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml"
+export BUNDLE_CSV ?= "./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
 
 .PHONY: bundle-update
 bundle-update: verify-previous-version ## Update CSV fields and validate the bundle directory
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${BUNDLE_CSV}
 	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ${BUNDLE_CSV}
-	sed -r -i "s|replaces: .*|replaces: $(OPERATOR_NAME)-operator.v${PREVIOUS_VERSION}|;" ${BUNDLE_CSV}
+	sed -r -i "s|replaces: .*|replaces: $(OPERATOR_NAME).v${PREVIOUS_VERSION}|;" ${BUNDLE_CSV}
 	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${BUNDLE_CSV}
 	$(MAKE) bundle-validate
 
