@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,12 +22,12 @@ var _ = Describe("NodeMaintenance Validation", func() {
 
 	BeforeEach(func() {
 		// create quorum ns on 1st run
-		quorumNs := &v1.Namespace{
+		quorumNs := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: EtcdQuorumPDBNamespace,
 			},
 		}
-		if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(quorumNs), &v1.Namespace{}); err != nil {
+		if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(quorumNs), &corev1.Namespace{}); err != nil {
 			err := k8sClient.Create(context.Background(), quorumNs)
 			Expect(err).ToNot(HaveOccurred())
 		}
@@ -48,7 +48,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 
 		Context("for node already in maintenance", func() {
 
-			var node *v1.Node
+			var node *corev1.Node
 			var nmExisting *NodeMaintenance
 
 			BeforeEach(func() {
@@ -85,7 +85,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 
 		Context("for master/control-plane node", func() {
 
-			var node *v1.Node
+			var node *corev1.Node
 
 			BeforeEach(func() {
 				node = getTestNode(existingNodeName, true)
@@ -107,19 +107,19 @@ var _ = Describe("NodeMaintenance Validation", func() {
 
 				})
 				When("node has etcd guard pod", func() {
-					var guardPod *v1.Pod
+					var guardPod *corev1.Pod
 					BeforeEach(func() {
 						guardPod = getPodGuard(existingNodeName)
 						Expect(k8sClient.Create(context.Background(), guardPod)).To(Succeed())
-						setPodConditionReady(context.Background(), guardPod, v1.ConditionTrue)
+						setPodConditionReady(context.Background(), guardPod, corev1.ConditionTrue)
 						// delete with force as the guard pod deletion takes time and won't happen immediately
 						var force client.GracePeriodSeconds = 0
 						DeferCleanup(k8sClient.Delete, context.Background(), guardPod, force)
 					})
 					It("should be allowed if the pod is on Fail state", func() {
-						testGuardPod := &v1.Pod{}
+						testGuardPod := &corev1.Pod{}
 						Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(guardPod), testGuardPod)).To(Succeed())
-						setPodConditionReady(context.Background(), testGuardPod, v1.ConditionFalse)
+						setPodConditionReady(context.Background(), testGuardPod, corev1.ConditionFalse)
 
 						nm := getTestNMO(existingNodeName)
 						Expect(nm.ValidateCreate()).Error().NotTo(HaveOccurred())
@@ -198,8 +198,8 @@ func getTestNMO(nodeName string) *NodeMaintenance {
 	}
 }
 
-func getTestNode(name string, isControlPlane bool) *v1.Node {
-	node := &v1.Node{
+func getTestNode(name string, isControlPlane bool) *corev1.Node {
+	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -222,12 +222,12 @@ func getTestPDB() *policyv1.PodDisruptionBudget {
 }
 
 // getPodGuard returns guard pod with expected label and Ready condition is True for a given nodeName
-func getPodGuard(nodeName string) *v1.Pod {
-	dummyContainer := v1.Container{
+func getPodGuard(nodeName string) *corev1.Pod {
+	dummyContainer := corev1.Container{
 		Name:  "container-name",
 		Image: "foo",
 	}
-	return &v1.Pod{
+	return &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{Kind: "Pod"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "guard-" + nodeName,
@@ -236,16 +236,16 @@ func getPodGuard(nodeName string) *v1.Pod {
 				"app": "guard",
 			},
 		},
-		Spec: v1.PodSpec{
+		Spec: corev1.PodSpec{
 			NodeName: nodeName,
-			Containers: []v1.Container{
+			Containers: []corev1.Container{
 				dummyContainer,
 			},
 		},
 	}
 }
 
-func setPodConditionReady(ctx context.Context, pod *v1.Pod, readyVal v1.ConditionStatus) {
-	pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: readyVal}}
+func setPodConditionReady(ctx context.Context, pod *corev1.Pod, readyVal corev1.ConditionStatus) {
+	pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: readyVal}}
 	Expect(k8sClient.Status().Update(context.Background(), pod)).To(Succeed())
 }

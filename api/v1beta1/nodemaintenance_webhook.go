@@ -23,7 +23,7 @@ import (
 	"github.com/medik8s/common/pkg/etcd"
 	"github.com/medik8s/common/pkg/nodes"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -184,9 +184,9 @@ func (v *NodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) e
 	return nil
 }
 
-// if the returned node is nil, it wasn't found
-func getNode(nodeName string, client client.Client) (*v1.Node, error) {
-	var node v1.Node
+// getNode returns a node if it exists, otherwise it returns nil
+func getNode(nodeName string, client client.Client) (*corev1.Node, error) {
+	var node corev1.Node
 	key := types.NamespacedName{
 		Name: nodeName,
 	}
