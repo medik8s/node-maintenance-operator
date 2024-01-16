@@ -20,10 +20,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/medik8s/common/pkg/etcd"
 	"github.com/medik8s/common/pkg/nodes"
 
 	v1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -163,7 +163,8 @@ func (v *NodeMaintenanceValidator) validateNoNodeMaintenanceExists(nodeName stri
 
 func (v *NodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) error {
 	// check if the node is a control-plane node
-	if node, err := getNode(nodeName, v.client); err != nil {
+	node, err := getNode(nodeName, v.client)
+	if err != nil {
 		return fmt.Errorf("could not get node for master/control-plane quorum validation, please try again: %v", err)
 	} else if node == nil {
 		// this should have been catched already, but just in case
@@ -172,31 +173,11 @@ func (v *NodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) e
 		// not a control-plane node, nothing to do
 		return nil
 	}
-
-	// check the etcd-quorum-guard PodDisruptionBudget if we can drain a control-plane node
-	disruptionsAllowed := int32(-1)
-	for _, pdbName := range []string{EtcdQuorumPDBNewName, EtcdQuorumPDBOldName} {
-		var pdb policyv1.PodDisruptionBudget
-		key := types.NamespacedName{
-			Namespace: EtcdQuorumPDBNamespace,
-			Name:      pdbName,
-		}
-		if err := v.client.Get(context.TODO(), key, &pdb); err != nil {
-			if apierrors.IsNotFound(err) {
-				// try next one
-				continue
-			}
-			return fmt.Errorf("could not get the etcd quorum guard PDB for master/control-plane quorum validation, please try again: %v", err)
-		}
-		disruptionsAllowed = pdb.Status.DisruptionsAllowed
-		break
+	canDisrupt, err := etcd.IsEtcdDisruptionAllowed(context.Background(), v.client, nodemaintenancelog, node)
+	if err != nil {
+		return err
 	}
-	if disruptionsAllowed == -1 {
-		// TODO do we need a fallback for k8s clusters?
-		nodemaintenancelog.Info("etcd quorum guard PDB hasn't been found. Skipping master/control-plane quorum validation.")
-		return nil
-	}
-	if disruptionsAllowed == 0 {
+	if !canDisrupt {
 		return fmt.Errorf(ErrorControlPlaneQuorumViolation)
 	}
 	return nil
