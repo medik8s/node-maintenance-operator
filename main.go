@@ -26,6 +26,7 @@ import (
 	"runtime"
 
 	"github.com/medik8s/common/pkg/lease"
+	"go.uber.org/zap/zapcore"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -38,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/api/v1beta1"
 	"github.com/medik8s/node-maintenance-operator/controllers"
@@ -64,10 +66,11 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	var enableHTTP2 bool
+	var (
+		metricsAddr, probeAddr string
+		enableLeaderElection, enableHTTP2 bool
+		webhookOpts          webhook.Options
+	) 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -77,6 +80,7 @@ func main() {
 
 	opts := zap.Options{
 		Development: true,
+		TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -85,12 +89,11 @@ func main() {
 
 	printVersion()
 
+	configureWebhookOpts(&webhookOpts, enableHTTP2)
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
-		// HEADS UP: once controller runtime is updated and this changes to metrics.Options{},
-		// and in case you configure TLS / SecureServing, disable HTTP/2 in it for mitigating related CVEs!
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		WebhookServer:          webhook.NewServer(webhookOpts),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "135b1886.medik8s.io",
@@ -100,12 +103,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	configureWebhookServer(mgr, enableHTTP2)
 
 	cl := mgr.GetClient()
 	leaseManagerInitializer := &leaseManagerInitializer{cl: cl}
 	if err := mgr.Add(leaseManagerInitializer); err != nil {
-		setupLog.Error(err, "unable to set up lease Manager", "webhook", "NodeMaintenance")
+		setupLog.Error(err, "unable to set up lease Manager", "lease", "NodeMaintenance")
 		os.Exit(1)
 	}
 
@@ -158,11 +160,8 @@ func (ls *leaseManagerInitializer) Start(context.Context) error {
 	return err
 }
 
-func configureWebhookServer(mgr ctrl.Manager, enableHTTP2 bool) {
+func configureWebhookOpts(webhookOpts *webhook.Options, enableHTTP2 bool) {
 
-	server := mgr.GetWebhookServer()
-
-	// check for OLM injected certs
 	certs := []string{filepath.Join(WebhookCertDir, WebhookCertName), filepath.Join(WebhookCertDir, WebhookKeyName)}
 	certsInjected := true
 	for _, fname := range certs {
@@ -172,16 +171,16 @@ func configureWebhookServer(mgr ctrl.Manager, enableHTTP2 bool) {
 		}
 	}
 	if certsInjected {
-		server.CertDir = WebhookCertDir
-		server.CertName = WebhookCertName
-		server.KeyName = WebhookKeyName
+		webhookOpts.CertDir = WebhookCertDir
+		webhookOpts.CertName = WebhookCertName
+		webhookOpts.KeyName = WebhookKeyName
+		webhookOpts.TLSOpts = []func(*tls.Config){}
 	} else {
 		setupLog.Info("OLM injected certs for webhooks not found")
 	}
-
 	// disable http/2 for mitigating relevant CVEs
 	if !enableHTTP2 {
-		server.TLSOpts = append(server.TLSOpts,
+		webhookOpts.TLSOpts = append(webhookOpts.TLSOpts,
 			func(c *tls.Config) {
 				c.NextProtos = []string{"http/1.1"}
 			},

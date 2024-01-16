@@ -24,7 +24,7 @@ metadata:
     olm.skipRange: '>=0.12.0'
     operatorframework.io/suggested-namespace: openshift-workload-availability
     operatorframework.io/suggested-namespace-template: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"openshift-workload-availability","annotations":{"openshift.io/node-selector":""}}}'
-    operators.operatorframework.io/builder: operator-sdk-v1.30.0
+    operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/medik8s/node-maintenance-operator
     support: Medik8s
