@@ -49,12 +49,15 @@ var _ = Describe("Starting Maintenance", func() {
 
 	Context("for the 1st master/control-plane node", func() {
 
-		var err error
+		var (
+			controlPlaneNode string
+			err              error
+		)
 
 		JustBeforeEach(func() {
 			if controPlaneMaintenance == nil {
 				// do this once only
-				controlPlaneNode := controlPlaneNodes[0]
+				controlPlaneNode = controlPlaneNodes[0]
 				controPlaneMaintenance = getNodeMaintenance(fmt.Sprintf("test-1st-control-plane-%s", controlPlaneNode), controlPlaneNode)
 				err = createCRIgnoreUnrelatedErrors(controPlaneMaintenance)
 			}
@@ -75,7 +78,7 @@ var _ = Describe("Starting Maintenance", func() {
 			// on Openshift the etcd-quorum-guard PDB should prevent setting maintenance
 			// on k8s the fake etcd-quorum-guard PDB should do as well
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(nmo.ErrorControlPlaneQuorumViolation), "Unexpected error message")
+			Expect(err.Error()).To(ContainSubstring(nmo.ErrorControlPlaneQuorumViolation, controlPlaneNode), "Unexpected error message")
 		})
 	})
 
@@ -108,7 +111,7 @@ var _ = Describe("Starting Maintenance", func() {
 
 			err := createCRIgnoreUnrelatedErrors(nodeMaintenance)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(nmo.ErrorControlPlaneQuorumViolation), "Unexpected error message")
+			Expect(err.Error()).To(ContainSubstring(nmo.ErrorControlPlaneQuorumViolation, controlPlaneNode), "Unexpected error message")
 		})
 	})
 

@@ -37,7 +37,7 @@ import (
 const (
 	ErrorNodeNotExists               = "invalid nodeName, no node with name %s found"
 	ErrorNodeMaintenanceExists       = "invalid nodeName, a NodeMaintenance for node %s already exists"
-	ErrorControlPlaneQuorumViolation = "can not put master/control-plane node into maintenance at this moment, it would violate the master/control-plane node quorum"
+	ErrorControlPlaneQuorumViolation = "can not put master/control-plane node into maintenance at this moment, disrupting node %s will violate etcd quorum"
 	ErrorNodeNameUpdateForbidden     = "updating spec.NodeName isn't allowed"
 )
 
@@ -179,7 +179,7 @@ func (v *NodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) e
 		return err
 	}
 	if !canDisrupt {
-		return fmt.Errorf(ErrorControlPlaneQuorumViolation)
+		return fmt.Errorf(ErrorControlPlaneQuorumViolation, nodeName)
 	}
 	return nil
 }

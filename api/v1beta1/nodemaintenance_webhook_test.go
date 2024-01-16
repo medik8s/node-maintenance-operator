@@ -15,8 +15,10 @@ import (
 
 var _ = Describe("NodeMaintenance Validation", func() {
 
-	const nonExistingNodeName = "node-not-exists"
-	const existingNodeName = "node-exists"
+	const (
+		nonExistingNodeName = "node-not-exists"
+		existingNodeName    = "node-exists"
+	)
 
 	BeforeEach(func() {
 		// create quorum ns on 1st run
@@ -98,65 +100,70 @@ var _ = Describe("NodeMaintenance Validation", func() {
 
 			Context("with potential quorum violation", func() {
 
-				var pdb *policyv1.PodDisruptionBudget
-
 				BeforeEach(func() {
-					pdb = getTestPDB()
-					err := k8sClient.Create(context.Background(), pdb)
-					Expect(err).ToNot(HaveOccurred())
-				})
+					pdb := getTestPDB()
+					Expect(k8sClient.Create(context.Background(), pdb)).To(Succeed())
+					DeferCleanup(k8sClient.Delete, context.Background(), pdb)
 
-				AfterEach(func() {
-					err := k8sClient.Delete(context.Background(), pdb)
-					Expect(err).ToNot(HaveOccurred())
 				})
+				When("node has etcd guard pod", func() {
+					var guardPod *v1.Pod
+					BeforeEach(func() {
+						guardPod = getPodGuard(existingNodeName)
+						Expect(k8sClient.Create(context.Background(), guardPod)).To(Succeed())
+						setPodConditionReady(context.Background(), guardPod, v1.ConditionTrue)
+						// delete with force as the guard pod deletion takes time and won't happen immediately
+						var force client.GracePeriodSeconds = 0
+						DeferCleanup(k8sClient.Delete, context.Background(), guardPod, force)
+					})
+					It("should be allowed if the pod is on Fail state", func() {
+						testGuardPod := &v1.Pod{}
+						Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(guardPod), testGuardPod)).To(Succeed())
+						setPodConditionReady(context.Background(), testGuardPod, v1.ConditionFalse)
 
-				It("should be rejected", func() {
-					nm := getTestNMO(existingNodeName)
-					_, err := nm.ValidateCreate()
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring(ErrorControlPlaneQuorumViolation))
+						nm := getTestNMO(existingNodeName)
+						Expect(nm.ValidateCreate()).Error().NotTo(HaveOccurred())
+					})
+					It("should be rejected if the pod is on True state", func() {
+						nm := getTestNMO(existingNodeName)
+						_, err := nm.ValidateCreate()
+						Expect(err).To(HaveOccurred())
+						Expect(err.Error()).To(ContainSubstring(ErrorControlPlaneQuorumViolation, node.Name))
+					})
 				})
-
+				When("node doesn't have etcd guard pod", func() {
+					It("should be allowed", func() {
+						nm := getTestNMO(existingNodeName)
+						Expect(nm.ValidateCreate()).Error().NotTo(HaveOccurred())
+					})
+				})
 			})
 
 			Context("without potential quorum violation", func() {
 
-				var pdb *policyv1.PodDisruptionBudget
-
 				BeforeEach(func() {
-					pdb = getTestPDB()
-					err := k8sClient.Create(context.Background(), pdb)
-					Expect(err).ToNot(HaveOccurred())
+					pdb := getTestPDB()
+					Expect(k8sClient.Create(context.Background(), pdb)).To(Succeed())
+					DeferCleanup(k8sClient.Delete, context.Background(), pdb)
 
 					pdb.Status.DisruptionsAllowed = 1
-					err = k8sClient.Status().Update(context.Background(), pdb)
-					Expect(err).ToNot(HaveOccurred())
+					Expect(k8sClient.Status().Update(context.Background(), pdb)).To(Succeed())
 				})
 
-				AfterEach(func() {
-					err := k8sClient.Delete(context.Background(), pdb)
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				It("should not be rejected", func() {
+				It("should be allowed", func() {
 					nm := getTestNMO(existingNodeName)
-					Eventually(func() error {
-						_, err := nm.ValidateCreate()
-						return err
-					}, time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
+					Expect(nm.ValidateCreate()).Error().NotTo(HaveOccurred())
 				})
 
 			})
 
 			Context("without etcd quorum guard PDB", func() {
 
-				It("should not be rejected", func() {
+				It("should be rejected", func() {
 					nm := getTestNMO(existingNodeName)
-					Eventually(func() error {
-						_, err := nm.ValidateCreate()
-						return err
-					}, time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
+					_, err := nm.ValidateCreate()
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring(ErrorControlPlaneQuorumViolation, node.Name))
 				})
 
 			})
@@ -212,4 +219,33 @@ func getTestPDB() *policyv1.PodDisruptionBudget {
 			Name:      EtcdQuorumPDBNewName,
 		},
 	}
+}
+
+// getPodGuard returns guard pod with expected label and Ready condition is True for a given nodeName
+func getPodGuard(nodeName string) *v1.Pod {
+	dummyContainer := v1.Container{
+		Name:  "container-name",
+		Image: "foo",
+	}
+	return &v1.Pod{
+		TypeMeta: metav1.TypeMeta{Kind: "Pod"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "guard-" + nodeName,
+			Namespace: EtcdQuorumPDBNamespace,
+			Labels: map[string]string{
+				"app": "guard",
+			},
+		},
+		Spec: v1.PodSpec{
+			NodeName: nodeName,
+			Containers: []v1.Container{
+				dummyContainer,
+			},
+		},
+	}
+}
+
+func setPodConditionReady(ctx context.Context, pod *v1.Pod, readyVal v1.ConditionStatus) {
+	pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: readyVal}}
+	Expect(k8sClient.Status().Update(context.Background(), pod)).To(Succeed())
 }
