@@ -37,8 +37,8 @@ import (
 const (
 	ErrorNodeNotExists               = "invalid nodeName, no node with name %s found"
 	ErrorNodeMaintenanceExists       = "invalid nodeName, a NodeMaintenance for node %s already exists"
-	ErrorNodeNameUpdateForbidden     = "updating spec.NodeName isn't allowed"
 	ErrorControlPlaneQuorumViolation = "can not put master/control-plane node into maintenance at this moment, it would violate the master/control-plane node quorum"
+	ErrorNodeNameUpdateForbidden     = "updating spec.NodeName isn't allowed"
 )
 
 const (
@@ -108,20 +108,21 @@ func (r *NodeMaintenance) ValidateDelete() (admission.Warnings, error) {
 
 func (v *NodeMaintenanceValidator) ValidateCreate(nm *NodeMaintenance) error {
 	// Validate that node with given name exists
-	if err := v.validateNodeExists(nm.Spec.NodeName); err != nil {
-		nodemaintenancelog.Info("validation failed", "error", err)
+	nodeName := nm.Spec.NodeName
+	if err := v.validateNodeExists(nodeName); err != nil {
+		nodemaintenancelog.Info("validation failed ", "nmName", nm.Name, "nodeName", nodeName, "error", err)
 		return err
 	}
 
 	// Validate that no NodeMaintenance for given node exists yet
-	if err := v.validateNoNodeMaintenanceExists(nm.Spec.NodeName); err != nil {
-		nodemaintenancelog.Info("validation failed", "error", err)
+	if err := v.validateNoNodeMaintenanceExists(nodeName); err != nil {
+		nodemaintenancelog.Info("validation failed", "nmName", nm.Name, "nodeName", nodeName, "error", err)
 		return err
 	}
 
 	// Validate that NodeMaintenance for control-plane nodes don't violate quorum
-	if err := v.validateControlPlaneQuorum(nm.Spec.NodeName); err != nil {
-		nodemaintenancelog.Info("validation failed", "error", err)
+	if err := v.validateControlPlaneQuorum(nodeName); err != nil {
+		nodemaintenancelog.Info("validation failed", "nmName", nm.Name, "nodeName", nodeName, "error", err)
 		return err
 	}
 
