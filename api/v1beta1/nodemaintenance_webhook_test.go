@@ -11,6 +11,8 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/medik8s/node-maintenance-operator/pkg/utils"
 )
 
 var _ = Describe("NodeMaintenance Validation", func() {
@@ -91,6 +93,10 @@ var _ = Describe("NodeMaintenance Validation", func() {
 				node = getTestNode(existingNodeName, true)
 				err := k8sClient.Create(context.Background(), node)
 				Expect(err).ToNot(HaveOccurred())
+				// mock IsOpenshiftSupported value and set it true for the quorum violation check
+				orgValue := utils.IsOpenshiftSupported
+				utils.IsOpenshiftSupported = true
+				DeferCleanup(func() { utils.IsOpenshiftSupported = orgValue })
 			})
 
 			AfterEach(func() {

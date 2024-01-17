@@ -32,6 +32,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/medik8s/node-maintenance-operator/pkg/utils"
 )
 
 const (
@@ -163,7 +165,12 @@ func (v *NodeMaintenanceValidator) validateNoNodeMaintenanceExists(nodeName stri
 }
 
 func (v *NodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) error {
-	// check if the node is a control-plane node
+	if !utils.IsOpenshiftSupported {
+		// etcd quorum PDB is only installed in OpenShift
+		nodemaintenancelog.Info("Cluster does not have etcd quorum PDB, thus we can't asses control-plane quorum violation")
+		return nil
+	}
+	// check if the node is a control-plane node on OpenShift
 	node, err := getNode(nodeName, v.client)
 	if err != nil {
 		return fmt.Errorf("could not get node for master/control-plane quorum validation, please try again: %v", err)
@@ -174,11 +181,13 @@ func (v *NodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) e
 		// not a control-plane node, nothing to do
 		return nil
 	}
-	canDisrupt, err := etcd.IsEtcdDisruptionAllowed(context.Background(), v.client, nodemaintenancelog, node)
+	// The node is a control-plane node on OpenShift
+	// now we check if adding nm CR for this node will disrupt control-plane quorum
+	isDisruptionAllowed, err := etcd.IsEtcdDisruptionAllowed(context.Background(), v.client, nodemaintenancelog, node)
 	if err != nil {
 		return err
 	}
-	if !canDisrupt {
+	if !isDisruptionAllowed {
 		return fmt.Errorf(ErrorControlPlaneQuorumViolation, nodeName)
 	}
 	return nil
