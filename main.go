@@ -112,11 +112,15 @@ func main() {
 		os.Exit(1)
 	}
 	
-	if err := utils.ValidateIsOpenshift(mgr.GetConfig()); err != nil {
+	openshiftCheck,err := utils.NewOpenshiftValidator(mgr.GetConfig())
+	if err != nil {
 		setupLog.Error(err, "failed to check if we run on Openshift")
 		os.Exit(1)
 	}
-	setupLog.Info("NMO was installed on Openshift cluster")
+	isOpenShift := openshiftCheck.IsOpenshiftSupported()
+	if isOpenShift{
+		setupLog.Info("NMO was installed on Openshift cluster")
+	}
 	
 
 	if err = (&controllers.NodeMaintenanceReconciler{
@@ -127,7 +131,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeMaintenance")
 		os.Exit(1)
 	}
-	if err = (&nodemaintenancev1beta1.NodeMaintenance{}).SetupWebhookWithManager(mgr); err != nil {
+	if err = (&nodemaintenancev1beta1.NodeMaintenance{}).SetupWebhookWithManager(isOpenShift, mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "NodeMaintenance")
 		os.Exit(1)
 	}

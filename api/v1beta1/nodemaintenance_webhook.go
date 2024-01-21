@@ -32,8 +32,6 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	"github.com/medik8s/node-maintenance-operator/pkg/utils"
 )
 
 const (
@@ -57,15 +55,17 @@ var nodemaintenancelog = logf.Log.WithName("nodemaintenance-resource")
 // NodeMaintenanceValidator validates NodeMaintenance resources. Needed because we need a client for validation
 // +k8s:deepcopy-gen=false
 type NodeMaintenanceValidator struct {
-	client client.Client
+	client      client.Client
+	isOpenShift bool
 }
 
 var validator *NodeMaintenanceValidator
 
-func (r *NodeMaintenance) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (r *NodeMaintenance) SetupWebhookWithManager(isOpenShift bool, mgr ctrl.Manager) error {
 	// init the validator!
 	validator = &NodeMaintenanceValidator{
-		client: mgr.GetClient(),
+		client:      mgr.GetClient(),
+		isOpenShift: isOpenShift,
 	}
 
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -165,7 +165,7 @@ func (v *NodeMaintenanceValidator) validateNoNodeMaintenanceExists(nodeName stri
 }
 
 func (v *NodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) error {
-	if !utils.IsOpenshiftSupported {
+	if !v.isOpenShift {
 		// etcd quorum PDB is only installed in OpenShift
 		nodemaintenancelog.Info("Cluster does not have etcd quorum PDB, thus we can't asses control-plane quorum violation")
 		return nil
