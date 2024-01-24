@@ -42,8 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-
-	"github.com/medik8s/node-maintenance-operator/pkg/utils"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -100,10 +98,6 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
-
-	openshiftCheck, err := utils.NewOpenshiftValidator(cfg)
-	Expect(err).NotTo(HaveOccurred(), "failed to check if we run on Openshift")
-	Expect(openshiftCheck.IsOpenshiftSupported()).To(BeFalse())
 
 	// start webhook server using Manager
 	webhookInstallOptions := &testEnv.WebhookInstallOptions
