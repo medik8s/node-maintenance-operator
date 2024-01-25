@@ -43,6 +43,7 @@ import (
 
 	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/api/v1beta1"
 	"github.com/medik8s/node-maintenance-operator/controllers"
+	"github.com/medik8s/node-maintenance-operator/pkg/utils"
 	"github.com/medik8s/node-maintenance-operator/version"
 	//+kubebuilder:scaffold:imports
 )
@@ -110,6 +111,17 @@ func main() {
 		setupLog.Error(err, "unable to set up lease Manager", "lease", "NodeMaintenance")
 		os.Exit(1)
 	}
+	
+	openshiftCheck,err := utils.NewOpenshiftValidator(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "failed to check if we run on Openshift")
+		os.Exit(1)
+	}
+	isOpenShift := openshiftCheck.IsOpenshiftSupported()
+	if isOpenShift{
+		setupLog.Info("NMO was installed on Openshift cluster")
+	}
+	
 
 	if err = (&controllers.NodeMaintenanceReconciler{
 		Client:       cl,
@@ -119,7 +131,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeMaintenance")
 		os.Exit(1)
 	}
-	if err = (&nodemaintenancev1beta1.NodeMaintenance{}).SetupWebhookWithManager(mgr); err != nil {
+	if err = (&nodemaintenancev1beta1.NodeMaintenance{}).SetupWebhookWithManager(isOpenShift, mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "NodeMaintenance")
 		os.Exit(1)
 	}

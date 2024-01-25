@@ -20,10 +20,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/medik8s/common/pkg/etcd"
 	"github.com/medik8s/common/pkg/nodes"
 
-	v1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,8 +37,8 @@ import (
 const (
 	ErrorNodeNotExists               = "invalid nodeName, no node with name %s found"
 	ErrorNodeMaintenanceExists       = "invalid nodeName, a NodeMaintenance for node %s already exists"
+	ErrorControlPlaneQuorumViolation = "can not put master/control-plane node into maintenance at this moment, disrupting node %s will violate etcd quorum"
 	ErrorNodeNameUpdateForbidden     = "updating spec.NodeName isn't allowed"
-	ErrorControlPlaneQuorumViolation = "can not put master/control-plane node into maintenance at this moment, it would violate the master/control-plane node quorum"
 )
 
 const (
@@ -55,15 +55,17 @@ var nodemaintenancelog = logf.Log.WithName("nodemaintenance-resource")
 // NodeMaintenanceValidator validates NodeMaintenance resources. Needed because we need a client for validation
 // +k8s:deepcopy-gen=false
 type NodeMaintenanceValidator struct {
-	client client.Client
+	client      client.Client
+	isOpenShift bool
 }
 
 var validator *NodeMaintenanceValidator
 
-func (r *NodeMaintenance) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (r *NodeMaintenance) SetupWebhookWithManager(isOpenShift bool, mgr ctrl.Manager) error {
 	// init the validator!
 	validator = &NodeMaintenanceValidator{
-		client: mgr.GetClient(),
+		client:      mgr.GetClient(),
+		isOpenShift: isOpenShift,
 	}
 
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -108,20 +110,21 @@ func (r *NodeMaintenance) ValidateDelete() (admission.Warnings, error) {
 
 func (v *NodeMaintenanceValidator) ValidateCreate(nm *NodeMaintenance) error {
 	// Validate that node with given name exists
-	if err := v.validateNodeExists(nm.Spec.NodeName); err != nil {
-		nodemaintenancelog.Info("validation failed", "error", err)
+	nodeName := nm.Spec.NodeName
+	if err := v.validateNodeExists(nodeName); err != nil {
+		nodemaintenancelog.Info("validation failed ", "nmName", nm.Name, "nodeName", nodeName, "error", err)
 		return err
 	}
 
 	// Validate that no NodeMaintenance for given node exists yet
-	if err := v.validateNoNodeMaintenanceExists(nm.Spec.NodeName); err != nil {
-		nodemaintenancelog.Info("validation failed", "error", err)
+	if err := v.validateNoNodeMaintenanceExists(nodeName); err != nil {
+		nodemaintenancelog.Info("validation failed", "nmName", nm.Name, "nodeName", nodeName, "error", err)
 		return err
 	}
 
 	// Validate that NodeMaintenance for control-plane nodes don't violate quorum
-	if err := v.validateControlPlaneQuorum(nm.Spec.NodeName); err != nil {
-		nodemaintenancelog.Info("validation failed", "error", err)
+	if err := v.validateControlPlaneQuorum(nodeName); err != nil {
+		nodemaintenancelog.Info("validation failed", "nmName", nm.Name, "nodeName", nodeName, "error", err)
 		return err
 	}
 
@@ -162,8 +165,14 @@ func (v *NodeMaintenanceValidator) validateNoNodeMaintenanceExists(nodeName stri
 }
 
 func (v *NodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) error {
-	// check if the node is a control-plane node
-	if node, err := getNode(nodeName, v.client); err != nil {
+	if !v.isOpenShift {
+		// etcd quorum PDB is only installed in OpenShift
+		nodemaintenancelog.Info("Cluster does not have etcd quorum PDB, thus we can't asses control-plane quorum violation")
+		return nil
+	}
+	// check if the node is a control-plane node on OpenShift
+	node, err := getNode(nodeName, v.client)
+	if err != nil {
 		return fmt.Errorf("could not get node for master/control-plane quorum validation, please try again: %v", err)
 	} else if node == nil {
 		// this should have been catched already, but just in case
@@ -172,39 +181,21 @@ func (v *NodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) e
 		// not a control-plane node, nothing to do
 		return nil
 	}
-
-	// check the etcd-quorum-guard PodDisruptionBudget if we can drain a control-plane node
-	disruptionsAllowed := int32(-1)
-	for _, pdbName := range []string{EtcdQuorumPDBNewName, EtcdQuorumPDBOldName} {
-		var pdb policyv1.PodDisruptionBudget
-		key := types.NamespacedName{
-			Namespace: EtcdQuorumPDBNamespace,
-			Name:      pdbName,
-		}
-		if err := v.client.Get(context.TODO(), key, &pdb); err != nil {
-			if apierrors.IsNotFound(err) {
-				// try next one
-				continue
-			}
-			return fmt.Errorf("could not get the etcd quorum guard PDB for master/control-plane quorum validation, please try again: %v", err)
-		}
-		disruptionsAllowed = pdb.Status.DisruptionsAllowed
-		break
+	// The node is a control-plane node on OpenShift
+	// now we check if adding nm CR for this node will disrupt control-plane quorum
+	isDisruptionAllowed, err := etcd.IsEtcdDisruptionAllowed(context.Background(), v.client, nodemaintenancelog, node)
+	if err != nil {
+		return err
 	}
-	if disruptionsAllowed == -1 {
-		// TODO do we need a fallback for k8s clusters?
-		nodemaintenancelog.Info("etcd quorum guard PDB hasn't been found. Skipping master/control-plane quorum validation.")
-		return nil
-	}
-	if disruptionsAllowed == 0 {
-		return fmt.Errorf(ErrorControlPlaneQuorumViolation)
+	if !isDisruptionAllowed {
+		return fmt.Errorf(ErrorControlPlaneQuorumViolation, nodeName)
 	}
 	return nil
 }
 
-// if the returned node is nil, it wasn't found
-func getNode(nodeName string, client client.Client) (*v1.Node, error) {
-	var node v1.Node
+// getNode returns a node if it exists, otherwise it returns nil
+func getNode(nodeName string, client client.Client) (*corev1.Node, error) {
+	var node corev1.Node
 	key := types.NamespacedName{
 		Name: nodeName,
 	}
