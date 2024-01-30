@@ -89,7 +89,6 @@ CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(IMAGE_TAG)
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(IMAGE_TAG)
 
-MUST_GATHER_IMAGE ?= node-maintenance-must-gather:$(IMAGE_TAG)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -245,14 +244,6 @@ docker-build: check ## Build docker image with the manager.
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
-
-.PHONY: must-gather-build
-must-gather-build: ## Build must-gather image.
-	docker build -t ${MUST_GATHER_IMAGE} ./must-gather
-
-.PHONY: must-gather-push
-must-gather-push: ## Push must-gather image.
-	docker push ${MUST_GATHER_IMAGE}
 
 ##@ Deployment
 
@@ -419,7 +410,7 @@ verify-unchanged: ## Verify there are no un-committed changes
 .PHONY: container-build 
 container-build: check ## Build containers
 	$(DOCKER_GO) "make bundle"
-	make docker-build bundle-build must-gather-build
+	make docker-build bundle-build
 
 .PHONY: bundle-build-community
 bundle-build-community: bundle-community ## Run bundle community changes in CSV, and then build the bundle image.
@@ -428,13 +419,13 @@ bundle-build-community: bundle-community ## Run bundle community changes in CSV,
 .PHONY: container-build-community
 container-build-community: check  ## Build containers for community
 	$(DOCKER_GO) "make bundle-community"
-	make docker-build bundle-build-community must-gather-build
+	make docker-build bundle-build-community
 
 .PHONY: container-push 
-container-push: docker-push bundle-push catalog-build catalog-push must-gather-push ## Push containers (NOTE: catalog can't be build before bundle was pushed)
+container-push: docker-push bundle-push catalog-build catalog-push## Push containers (NOTE: catalog can't be build before bundle was pushed)
 
 .PHONY: container-build-and-push-community
-container-build-and-push-community: container-build-community container-push ## Build four images, update CSV for community, and push all the images to Quay (docker, bundle, catalog, and must-gather).
+container-build-and-push-community: container-build-community container-push ## Build four images, update CSV for community, and push all the images to Quay (docker, bundle, and catalog).
 .PHONY: cluster-functest 
 cluster-functest: ginkgo ## Run e2e tests in a real cluster
 	./hack/functest.sh $(GINKGO_VERSION)
