@@ -89,7 +89,7 @@ CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(IMAGE_TAG)
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(IMAGE_TAG)
 
-MUST_GATHER_IMAGE ?= $(IMAGE_TAG_BASE)-must-gather:$(IMAGE_TAG)
+MUST_GATHER_IMAGE ?= node-maintenance-must-gather:$(IMAGE_TAG)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
