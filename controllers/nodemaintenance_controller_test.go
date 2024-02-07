@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -184,62 +185,91 @@ var _ = Describe("Node Maintenance", func() {
 			})
 		})
 	})
+
 	Context("Reconciliation", func() {
+		var nm *nodemaintenanceapi.NodeMaintenance
+		BeforeEach(func() {
+			Expect(k8sClient.Create(context.Background(), nodeOne)).To(Succeed())
+			DeferCleanup(k8sClient.Delete, context.Background(), nodeOne)
 
-		It("should reconcile once without failing", func() {
-			reconcileMaintenance(nm)
-			checkSuccesfulReconcile()
+			podOne, podTwo = getTestPod("test-pod-1", taintedNodeName), getTestPod("test-pod-2", taintedNodeName)
+			Expect(k8sClient.Create(context.Background(), podOne)).To(Succeed())
+			Expect(k8sClient.Create(context.Background(), podTwo)).To(Succeed())
+			DeferCleanup(cleanupPod, context.Background(), podOne)
+			DeferCleanup(cleanupPod, context.Background(), podTwo)
 		})
 
-		It("should reconcile and cordon node", func() {
-			reconcileMaintenance(nm)
-			checkSuccesfulReconcile()
-			node := &corev1.Node{}
-			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: nm.Spec.NodeName}, node)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(node.Spec.Unschedulable).To(Equal(true))
+		When("nm CR is valid", func() {
+			BeforeEach(func() {
+				nm = getTestNM("node-maintenance-cr", taintedNodeName)
+				Expect(k8sClient.Create(context.Background(), nm)).To(Succeed())
+			})
+			It("should cordon node and add proper taints", func() {
+				By("check nm CR status was success")
+				maintenance := getNMAfter1Sec(nm)
+				Expect(maintenance.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceSucceeded))
+				Expect(len(maintenance.Status.PendingPods)).To(Equal(0))
+				Expect(maintenance.Status.EvictionPods).To(Equal(2))
+				Expect(maintenance.Status.TotalPods).To(Equal(2))
+				Expect(maintenance.Status.DrainProgress).To(Equal(100))
+				Expect(maintenance.Status.LastError).To(Equal(""))
+				Expect(maintenance.Status.LastUpdate.IsZero()).To(BeFalse())
+				Expect(maintenance.Status.ErrorOnLeaseCount).To(Equal(0))
+
+				By("Check whether node was cordoned")
+				node := &corev1.Node{}
+				Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: nm.Spec.NodeName}, node)).To(Succeed())
+				Expect(node.Spec.Unschedulable).To(Equal(true))
+
+				By("Check node taints")
+				Expect(isTaintExist(node, medik8sDrainTaint.Key, corev1.TaintEffectNoSchedule)).To(BeTrue())
+				Expect(isTaintExist(node, NodeUnschedulableTaint.Key, corev1.TaintEffectNoSchedule)).To(BeTrue())
+
+				By("Check add/remove Exclude remediation label")
+				// Label added on CR creation
+				Expect(node.Labels[commonLabels.ExcludeFromRemediation]).To(Equal("true"))
+				// Re-fetch node after nm CR deletion
+				Expect(k8sClient.Delete(context.Background(), nm)).To(Succeed())
+				// Sleep for a second to ensure dummy reconciliation has begun running before the unit tests
+				time.Sleep(1 * time.Second)
+
+				Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: nm.Spec.NodeName}, node)).NotTo(HaveOccurred())
+				_, exist := node.Labels[commonLabels.ExcludeFromRemediation]
+				Expect(exist).To(BeFalse())
+			})
 		})
-
-		It("should reconcile and taint node", func() {
-			reconcileMaintenance(nm)
-			checkSuccesfulReconcile()
-			node := &corev1.Node{}
-			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: nm.Spec.NodeName}, node)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(taintExist(node, "medik8s.io/drain", corev1.TaintEffectNoSchedule)).To(BeTrue())
+		When("nm CR is invalid for a missing node", func() {
+			BeforeEach(func() {
+				nm = getTestNM("non-existing-node-cr", invalidNodeName)
+				Expect(k8sClient.Create(context.Background(), nm)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, context.Background(), nm)
+			})
+			It("should fail on non existing node", func() {
+				By("check nm CR status and whether LastError was updated")
+				maintenance := getNMAfter1Sec(nm)
+				Expect(maintenance.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceRunning))
+				Expect(len(maintenance.Status.PendingPods)).To(Equal(0))
+				Expect(maintenance.Status.EvictionPods).To(Equal(0))
+				Expect(maintenance.Status.TotalPods).To(Equal(0))
+				Expect(maintenance.Status.DrainProgress).To(Equal(0))
+				Expect(maintenance.Status.LastError).To(Equal(fmt.Sprintf("nodes \"%s\" not found", invalidNodeName)))
+				Expect(maintenance.Status.LastUpdate.IsZero()).To(BeFalse())
+				Expect(maintenance.Status.ErrorOnLeaseCount).To(Equal(0))
+			})
 		})
-
-		It("should fail on non existing node", func() {
-			nmFail := getTestNM()
-			nmFail.Spec.NodeName = "non-existing"
-			err := k8sClient.Delete(context.TODO(), nm)
-			Expect(err).NotTo(HaveOccurred())
-			err = k8sClient.Create(context.TODO(), nmFail)
-			Expect(err).NotTo(HaveOccurred())
-			reconcileMaintenance(nm)
-			checkFailedReconcile()
-		})
-
-		It("add/remove Exclude remediation label", func() {
-			reconcileMaintenance(nm)
-			checkSuccesfulReconcile()
-			node := &corev1.Node{}
-			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: nm.Spec.NodeName}, node)
-			Expect(err).NotTo(HaveOccurred())
-			//Label added on CR creation
-			Expect(node.Labels[labels.ExcludeFromRemediation]).To(Equal("true"))
-
-			Expect(k8sClient.Delete(context.Background(), nm)).To(Succeed())
-			reconcileMaintenance(nm)
-			//Re-fetch node after reconcile
-			Expect(k8sClient.Get(context.TODO(), client.ObjectKey{Name: nm.Spec.NodeName}, node)).NotTo(HaveOccurred())
-			_, exist := node.Labels[labels.ExcludeFromRemediation]
-			Expect(exist).To(BeFalse())
-		})
-
 	})
 })
-})
+
+func getNodeMaintenance(nm *nodemaintenanceapi.NodeMaintenance, timeout, pollTime string) *nodemaintenanceapi.NodeMaintenance {
+	maintenance := &nodemaintenanceapi.NodeMaintenance{}
+	Consistently(func() error {
+		return k8sClient.Get(context.Background(), client.ObjectKeyFromObject(nm), maintenance)
+	}, timeout, pollTime).Should(BeNil())
+	return maintenance
+}
+func getNMAfter1Sec(nm *nodemaintenanceapi.NodeMaintenance) *nodemaintenanceapi.NodeMaintenance {
+	return getNodeMaintenance(nm, succeedTimeout, succeedPollTime)
+}
 
 // isLabelExist checks whether a node label has the value true
 func isLabelExist(node *corev1.Node, label string) bool {
