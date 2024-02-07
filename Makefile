@@ -186,7 +186,7 @@ fix-imports: sort-imports ## Sort imports
 test: test-no-verify verify-unchanged ## Generate and format code, run tests, generate manifests and bundle, and verify no uncommitted changes
 
 .PHONY: test-no-verify
-test-no-verify: manifests generate go-verify test-imports fmt vet envtest ginkgo ## Generate and format code, and run tests
+test-no-verify: go-verify manifests generate fmt fix-imports vet envtest ginkgo ## Generate and format code, and run tests
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" \
 	$(GINKGO) -r --keep-going --randomize-all --repeat=3 --require-suite --vv --coverprofile cover.out ./controllers/... ./api/... ./pkg/...
 
