@@ -5,201 +5,134 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/medik8s/common/pkg/labels"
 	"github.com/medik8s/common/pkg/lease"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	nodemaintenanceapi "github.com/medik8s/node-maintenance-operator/api/v1beta1"
 )
 
+const (
+	taintedNodeName = "node01"
+	invalidNodeName = "non-existing"
+	dummyTaintKey   = "dummy-key"
+	testNamespace   = "test-namespace"
+	succeedTimeout  = "1s"
+	succeedPollTime = "200ms"
+)
+
+var testLog = ctrl.Log.WithName("nmo-controllers-unit-test")
 var _ = Describe("Node Maintenance", func() {
 
-	var r *NodeMaintenanceReconciler
-	var nm *nodemaintenanceapi.NodeMaintenance
-	var req reconcile.Request
-	var clObjs []client.Object
-
-	checkSuccesfulReconcile := func() {
-		maintenance := &nodemaintenanceapi.NodeMaintenance{}
-		err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(maintenance.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceSucceeded))
-		Expect(maintenance.Status.DrainProgress).To(Equal(100))
-	}
-
-	checkFailedReconcile := func() {
-		maintenance := &nodemaintenanceapi.NodeMaintenance{}
-		err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(len(maintenance.Status.LastError)).NotTo(Equal(0))
-	}
-
-	reconcileMaintenance := func(nm *nodemaintenanceapi.NodeMaintenance) {
-		_, _ = r.Reconcile(context.Background(), req)
-	}
-
-	taintExist := func(node *corev1.Node, key string, effect corev1.TaintEffect) bool {
-		checkTaint := corev1.Taint{
-			Key:    key,
-			Effect: effect,
-		}
-		taints := node.Spec.Taints
-		for _, taint := range taints {
-			if reflect.DeepEqual(taint, checkTaint) {
-				return true
-			}
-		}
-		return false
-	}
+	var (
+		nodeOne *corev1.Node
+	)
 
 	BeforeEach(func() {
-
-		startTestEnv()
-
-		// Create a ReconcileNodeMaintenance object with the scheme and fake client
-		// TODO add reconciler to manager in suite_test.go and don't call reconcile funcs manually
-		manager, _ := lease.NewManager(k8sClient, "")
-		r = &NodeMaintenanceReconciler{
-			Client:       k8sClient,
-			Scheme:       scheme.Scheme,
-			LeaseManager: &mockLeaseManager{manager},
-			logger:       ctrl.Log.WithName("unit test"),
-		}
-		_ = initDrainer(r, cfg)
-
-		// in test pods are not evicted, so don't wait forever for them
-		r.drainer.SkipWaitForDeleteTimeoutSeconds = 0
-
-		var objs []client.Object
-		nm, objs = getTestObjects()
-		clObjs = append(objs, nm)
-
-		// create test ns on 1st run
+		// create testNamespace ns
 		testNs := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "test",
+				Name: testNamespace,
 			},
 		}
 		if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(testNs), &corev1.Namespace{}); err != nil {
-			err := k8sClient.Create(context.Background(), testNs)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(k8sClient.Create(context.Background(), testNs)).To(Succeed())
 		}
-
-		for _, o := range clObjs {
-			err := k8sClient.Create(context.Background(), o)
-			Expect(err).ToNot(HaveOccurred())
-		}
-
-		// Mock request to simulate Reconcile() being called on an event for a watched resource .
-		req = reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: nm.ObjectMeta.Name,
-			},
-		}
+		nodeOne = getNode(taintedNodeName)
 	})
+	Context("Functionality test", func() {
+		Context("Initialization test", func() {
 
-	AfterEach(func() {
-		stopTestEnv()
-	})
+			It("Node maintenance should be initialized properly", func() {
+				_ = r.initMaintenanceStatus(nm)
+				maintenance := &nodemaintenanceapi.NodeMaintenance{}
+				err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(maintenance.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceRunning))
+				Expect(len(maintenance.Status.PendingPods)).To(Equal(2))
+				Expect(maintenance.Status.EvictionPods).To(Equal(2))
+				Expect(maintenance.Status.TotalPods).To(Equal(2))
+				Expect(maintenance.Status.DrainProgress).To(Equal(0))
+				Expect(maintenance.Status.LastUpdate.IsZero()).To(BeFalse())
+			})
 
-	Context("Initialization test", func() {
+			It("owner ref should be set properly", func() {
+				_ = r.initMaintenanceStatus(nm)
+				maintenance := &nodemaintenanceapi.NodeMaintenance{}
+				err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
+				node := &corev1.Node{}
+				err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, node)
+				Expect(err).ToNot(HaveOccurred())
+				r.setOwnerRefToNode(maintenance, node)
+				Expect(len(maintenance.ObjectMeta.GetOwnerReferences())).To(Equal(1))
+				ref := maintenance.ObjectMeta.GetOwnerReferences()[0]
+				Expect(ref.Name).To(Equal(node.ObjectMeta.Name))
+				Expect(ref.UID).To(Equal(node.ObjectMeta.UID))
+				Expect(ref.APIVersion).To(Equal(node.TypeMeta.APIVersion))
+				Expect(ref.Kind).To(Equal(node.TypeMeta.Kind))
+				r.setOwnerRefToNode(maintenance, node)
+				Expect(len(maintenance.ObjectMeta.GetOwnerReferences())).To(Equal(1))
+			})
 
-		It("Node maintenance should be initialized properly", func() {
-			_ = r.initMaintenanceStatus(nm)
-			maintenance := &nodemaintenanceapi.NodeMaintenance{}
-			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(maintenance.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceRunning))
-			Expect(len(maintenance.Status.PendingPods)).To(Equal(2))
-			Expect(maintenance.Status.EvictionPods).To(Equal(2))
-			Expect(maintenance.Status.TotalPods).To(Equal(2))
-			Expect(maintenance.Status.DrainProgress).To(Equal(0))
-			Expect(maintenance.Status.LastUpdate.IsZero()).To(BeFalse())
-		})
+			It("Should not init Node maintenance if already set", func() {
+				nmCopy := nm.DeepCopy()
+				nmCopy.Status.Phase = nodemaintenanceapi.MaintenanceRunning
+				_ = r.initMaintenanceStatus(nmCopy)
+				maintenance := &nodemaintenanceapi.NodeMaintenance{}
+				err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(maintenance.Status.Phase).NotTo(Equal(nodemaintenanceapi.MaintenanceRunning))
+				Expect(len(maintenance.Status.PendingPods)).NotTo(Equal(2))
+				Expect(maintenance.Status.EvictionPods).NotTo(Equal(2))
+				Expect(maintenance.Status.TotalPods).NotTo(Equal(2))
+				Expect(maintenance.Status.DrainProgress).To(Equal(0))
+				Expect(maintenance.Status.LastUpdate.IsZero()).To(BeTrue())
+			})
 
-		It("owner ref should be set properly", func() {
-			_ = r.initMaintenanceStatus(nm)
-			maintenance := &nodemaintenanceapi.NodeMaintenance{}
-			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
-			node := &corev1.Node{}
-			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, node)
-			Expect(err).ToNot(HaveOccurred())
-			r.setOwnerRefToNode(maintenance, node)
-			Expect(len(maintenance.ObjectMeta.GetOwnerReferences())).To(Equal(1))
-			ref := maintenance.ObjectMeta.GetOwnerReferences()[0]
-			Expect(ref.Name).To(Equal(node.ObjectMeta.Name))
-			Expect(ref.UID).To(Equal(node.ObjectMeta.UID))
-			Expect(ref.APIVersion).To(Equal(node.TypeMeta.APIVersion))
-			Expect(ref.Kind).To(Equal(node.TypeMeta.Kind))
-			r.setOwnerRefToNode(maintenance, node)
-			Expect(len(maintenance.ObjectMeta.GetOwnerReferences())).To(Equal(1))
-		})
+		})		
+		Context("Testing Taints", func() {
+			BeforeEach(func() {
+				Expect(k8sClient.Create(context.Background(), nodeOne)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, context.Background(), nodeOne)
+			})
+			When("Adding new taint", func() {
+				It("should add new taint and keep other existing taints", func() {
+					node := &corev1.Node{}
+					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: taintedNodeName}, node)).To(Succeed())
+					Expect(AddOrRemoveTaint(r.drainer.Client, node, true)).To(Succeed())
+					taintedNode := &corev1.Node{}
+					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: taintedNodeName}, taintedNode)).To(Succeed())
+					Expect(isTaintExist(taintedNode, medik8sDrainTaint.Key, medik8sDrainTaint.Effect)).To(BeTrue())
+					Expect(isTaintExist(taintedNode, NodeUnschedulableTaint.Key, NodeUnschedulableTaint.Effect)).To(BeTrue())
+					Expect(isTaintExist(taintedNode, dummyTaintKey, corev1.TaintEffectPreferNoSchedule)).To(BeTrue())
+					// there is also a not-ready taint
+					Expect(len(taintedNode.Spec.Taints)).To(Equal(4))
+				})
+			})
 
-		It("Should not init Node maintenance if already set", func() {
-			nmCopy := nm.DeepCopy()
-			nmCopy.Status.Phase = nodemaintenanceapi.MaintenanceRunning
-			_ = r.initMaintenanceStatus(nmCopy)
-			maintenance := &nodemaintenanceapi.NodeMaintenance{}
-			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(nm), maintenance)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(maintenance.Status.Phase).NotTo(Equal(nodemaintenanceapi.MaintenanceRunning))
-			Expect(len(maintenance.Status.PendingPods)).NotTo(Equal(2))
-			Expect(maintenance.Status.EvictionPods).NotTo(Equal(2))
-			Expect(maintenance.Status.TotalPods).NotTo(Equal(2))
-			Expect(maintenance.Status.DrainProgress).To(Equal(0))
-			Expect(maintenance.Status.LastUpdate.IsZero()).To(BeTrue())
-		})
-
-	})
-
-	Context("Taint functioninality test", func() {
-		It("should add medik8s NoSchedule taint and keep other existing taints", func() {
-			node := &corev1.Node{}
-			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, node)
-			Expect(err).NotTo(HaveOccurred())
-			_ = AddOrRemoveTaint(r.drainer.Client, node, true)
-			taintedNode := &corev1.Node{}
-			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, taintedNode)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(taintExist(taintedNode, "medik8s.io/drain", corev1.TaintEffectNoSchedule)).To(BeTrue())
-			Expect(taintExist(taintedNode, "node.kubernetes.io/unschedulable", corev1.TaintEffectNoSchedule)).To(BeTrue())
-			Expect(taintExist(taintedNode, "test", corev1.TaintEffectPreferNoSchedule)).To(BeTrue())
-
-			// there is a not-ready taint now as well... skip count tests
-			//Expect(len(taintedNode.Spec.Taints)).To(Equal(3))
-		})
-
-		It("should remove medik8s NoSchedule taint and keep other existing taints", func() {
-			node := &corev1.Node{}
-			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, node)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(taintExist(node, "medik8s.io/drain", corev1.TaintEffectNoSchedule)).To(BeFalse())
-			_ = AddOrRemoveTaint(r.drainer.Client, node, true)
-			taintedNode := &corev1.Node{}
-			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, taintedNode)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(taintExist(taintedNode, "medik8s.io/drain", corev1.TaintEffectNoSchedule)).To(BeTrue())
-			_ = AddOrRemoveTaint(r.drainer.Client, taintedNode, false)
-			unTaintedNode := &corev1.Node{}
-			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: "node01"}, unTaintedNode)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(taintExist(unTaintedNode, "medik8s.io/drain", corev1.TaintEffectNoSchedule)).To(BeFalse())
-			Expect(taintExist(unTaintedNode, "test", corev1.TaintEffectPreferNoSchedule)).To(BeTrue())
-
-			//Expect(len(unTaintedNode.Spec.Taints)).To(Equal(1))
+			When("Adding and then removing a taint", func() {
+				It("should keep other existing taints", func() {
+					node := &corev1.Node{}
+					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: taintedNodeName}, node)).To(Succeed())
+					Expect(isTaintExist(node, medik8sDrainTaint.Key, medik8sDrainTaint.Effect)).To(BeFalse())
+					Expect(AddOrRemoveTaint(r.drainer.Client, node, true)).To(Succeed())
+					taintedNode := &corev1.Node{}
+					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: taintedNodeName}, taintedNode)).To(Succeed())
+					Expect(isTaintExist(taintedNode, medik8sDrainTaint.Key, medik8sDrainTaint.Effect)).To(BeTrue())
+					Expect(AddOrRemoveTaint(r.drainer.Client, taintedNode, false)).To(Succeed())
+					unTaintedNode := &corev1.Node{}
+					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: taintedNodeName}, unTaintedNode)).To(Succeed())
+					Expect(isTaintExist(unTaintedNode, medik8sDrainTaint.Key, medik8sDrainTaint.Effect)).To(BeFalse())
+					Expect(isTaintExist(unTaintedNode, dummyTaintKey, corev1.TaintEffectPreferNoSchedule)).To(BeTrue())
+					// there is also a not-ready taint
+					Expect(len(unTaintedNode.Spec.Taints)).To(Equal(2))
+				})
+			})
 		})
 	})
-
 	Context("Reconciliation", func() {
 
 		It("should reconcile once without failing", func() {
@@ -255,86 +188,38 @@ var _ = Describe("Node Maintenance", func() {
 
 	})
 })
+})
 
-func getTestObjects() (*nodemaintenanceapi.NodeMaintenance, []client.Object) {
-	nm := getTestNM()
-
-	return nm, []client.Object{
-		&corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "node01",
-			},
-			Spec: corev1.NodeSpec{
-				Taints: []corev1.Taint{{
-					Key:    "test",
-					Effect: corev1.TaintEffectPreferNoSchedule},
-				},
-			},
-		},
-		&corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "node02",
-			},
-		},
-		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "test",
-				Name:      "test-pod-1",
-			},
-			Spec: corev1.PodSpec{
-				NodeName: "node01",
-				Containers: []corev1.Container{
-					{
-						Name:  "c1",
-						Image: "i1",
-					},
-				},
-				TerminationGracePeriodSeconds: pointer.Int64(0),
-			},
-			Status: corev1.PodStatus{
-				Conditions: []corev1.PodCondition{
-					{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionTrue,
-					},
-				},
-			},
-		},
-		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "test",
-				Name:      "test-pod-2",
-			},
-			Spec: corev1.PodSpec{
-				NodeName: "node01",
-				Containers: []corev1.Container{
-					{
-						Name:  "c1",
-						Image: "i1",
-					},
-				},
-				TerminationGracePeriodSeconds: pointer.Int64(0),
-			},
-			Status: corev1.PodStatus{
-				Conditions: []corev1.PodCondition{
-					{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionTrue,
-					},
-				},
-			},
-		},
-	}
+// isLabelExist checks whether a node label has the value true
+func isLabelExist(node *corev1.Node, label string) bool {
+	return node.Labels[label] == "true"
 }
 
-func getTestNM() *nodemaintenanceapi.NodeMaintenance {
-	return &nodemaintenanceapi.NodeMaintenance{
+// isTaintExist checks whether a node has a specific taint
+func isTaintExist(node *corev1.Node, key string, effect corev1.TaintEffect) bool {
+	checkTaint := corev1.Taint{
+		Key:    key,
+		Effect: effect,
+	}
+	taints := node.Spec.Taints
+	for _, taint := range taints {
+		if reflect.DeepEqual(taint, checkTaint) {
+			return true
+		}
+	}
+	return false
+}
+
+func getNode(nodeName string) *corev1.Node {
+	return &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "node-maintenance",
+			Name: nodeName,
 		},
-		Spec: nodemaintenanceapi.NodeMaintenanceSpec{
-			NodeName: "node01",
-			Reason:   "test reason",
+		Spec: corev1.NodeSpec{
+			Taints: []corev1.Taint{{
+				Key:    dummyTaintKey,
+				Effect: corev1.TaintEffectPreferNoSchedule},
+			},
 		},
 	}
 }

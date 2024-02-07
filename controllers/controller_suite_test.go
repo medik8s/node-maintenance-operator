@@ -21,17 +21,18 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/medik8s/common/pkg/lease"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/api/v1beta1"
 	//+kubebuilder:scaffold:imports
@@ -40,10 +41,15 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-var cfg *rest.Config
-var k8sClient client.Client
-var testEnv *envtest.Environment
-var ctxFromSignalHandler context.Context
+var (
+	cfg          *rest.Config
+	k8sClient    client.Client
+	testEnv      *envtest.Environment
+	ctx          context.Context
+	cancel       context.CancelFunc
+	fakeRecorder *record.FakeRecorder
+	r            *NodeMaintenanceReconciler
+)
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -55,9 +61,6 @@ var _ = BeforeSuite(func() {
 
 	// call start or refactor when moving to "normal" testEnv test
 
-})
-
-func startTestEnv() {
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "config", "crd", "bases")},
@@ -74,40 +77,38 @@ func startTestEnv() {
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
+	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{Scheme: scheme.Scheme})
+	Expect(err).NotTo(HaveOccurred())
+	Expect(k8sManager).NotTo(BeNil())
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:  scheme.Scheme,
-		Metrics: metricsServer.Options{BindAddress: "0"},
-	})
-	Expect(err).ToNot(HaveOccurred())
+	mockManager, _ := lease.NewManager(k8sClient, "")
+	// Create a ReconcileNodeMaintenance object with the scheme and fake client
+	r = &NodeMaintenanceReconciler{
+		Client:       k8sClient,
+		Scheme:       scheme.Scheme,
+		LeaseManager: &mockLeaseManager{mockManager},
+		logger:       ctrl.Log.WithName("unit test"),
+	}
+	Expect(initDrainer(r, cfg)).To(Succeed())
+	// in test pods are not evicted, so don't wait forever for them
+	r.drainer.SkipWaitForDeleteTimeoutSeconds = 0
 
-	// comment in when moving to "normal" testEnv test
-	// this isn't needed atm, because the controller tests call relevant funcs of the controller themself
-	//err = (&NodeMaintenanceReconciler{
-	//	Client: k8sManager.GetClient(),
-	//	Scheme: k8sManager.GetScheme(),
-	//}).SetupWithManager(k8sManager)
-	//Expect(err).ToNot(HaveOccurred())
+	err = (r).SetupWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
 
 	go func() {
-		if ctxFromSignalHandler == nil {
-			ctxFromSignalHandler = ctrl.SetupSignalHandler()
-		}
-		err = k8sManager.Start(ctxFromSignalHandler)
-		Expect(err).ToNot(HaveOccurred())
+		// https://github.com/kubernetes-sigs/controller-runtime/issues/1571
+		ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
+		Expect(k8sManager.Start(ctx)).To(Succeed())
 	}()
-}
-
-var _ = AfterSuite(func() {
-	// call stop or refactor when moving to "normal" testEnv test
 })
 
-func stopTestEnv() {
+var _ = AfterSuite(func() {
 	By("tearing down the test environment")
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
-}
+	cancel()
+	Expect(testEnv.Stop()).To(Succeed())
+})
