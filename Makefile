@@ -187,7 +187,8 @@ test: test-no-verify verify-unchanged ## Generate and format code, run tests, ge
 
 .PHONY: test-no-verify
 test-no-verify: manifests generate go-verify test-imports fmt vet envtest ginkgo ## Generate and format code, and run tests
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" $(GINKGO) -r --keep-going  --require-suite --vv ./api/... ./pkg/... ./controllers/... --coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" \
+	$(GINKGO) -r --keep-going --randomize-all --repeat=3 --require-suite --vv --coverprofile cover.out ./controllers/... ./api/... ./pkg/...
 
 .PHONY: bundle-run
 bundle-run: operator-sdk ## Run bundle image. Default NS is "openshift-workload-availability", redefine OPERATOR_NAMESPACE to override it.
