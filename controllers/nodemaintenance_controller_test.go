@@ -45,8 +45,8 @@ var _ = Describe("Node Maintenance", func() {
 				Name: testNamespace,
 			},
 		}
-		if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(testNs), &corev1.Namespace{}); err != nil {
-			Expect(k8sClient.Create(context.Background(), testNs)).To(Succeed())
+		if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(testNs), &corev1.Namespace{}); err != nil {
+			Expect(k8sClient.Create(ctx, testNs)).To(Succeed())
 		}
 		nodeOne = getNode(taintedNodeName)
 	})
@@ -54,14 +54,14 @@ var _ = Describe("Node Maintenance", func() {
 		Context("Testing initMaintenanceStatus", func() {
 			var nm *nodemaintenanceapi.NodeMaintenance
 			BeforeEach(func() {
-				Expect(k8sClient.Create(context.Background(), nodeOne)).To(Succeed())
-				DeferCleanup(k8sClient.Delete, context.Background(), nodeOne)
+				Expect(k8sClient.Create(ctx, nodeOne)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, ctx, nodeOne)
 
 				podOne, podTwo = getTestPod("test-pod-1", taintedNodeName), getTestPod("test-pod-2", taintedNodeName)
-				Expect(k8sClient.Create(context.Background(), podOne)).To(Succeed())
-				Expect(k8sClient.Create(context.Background(), podTwo)).To(Succeed())
-				DeferCleanup(cleanupPod, context.Background(), podOne)
-				DeferCleanup(cleanupPod, context.Background(), podTwo)
+				Expect(k8sClient.Create(ctx, podOne)).To(Succeed())
+				Expect(k8sClient.Create(ctx, podTwo)).To(Succeed())
+				DeferCleanup(cleanupPod, ctx, podOne)
+				DeferCleanup(cleanupPod, ctx, podTwo)
 				nm = getTestNM("node-maintenance-cr-initMaintenanceStatus", taintedNodeName)
 			})
 			When("Status was initalized", func() {
@@ -82,7 +82,7 @@ var _ = Describe("Node Maintenance", func() {
 					// status was initialized but the function will fail on updating the CR status, since we don't create a nm CR here
 					By("Setting owner ref for a modified nm CR")
 					node := &corev1.Node{}
-					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: taintedNodeName}, node)).To(Succeed())
+					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, node)).To(Succeed())
 					setOwnerRefToNode(nm, node, r.logger)
 					Expect(nm.ObjectMeta.GetOwnerReferences()).To(HaveLen(1))
 					ref := nm.ObjectMeta.GetOwnerReferences()[0]
@@ -102,7 +102,7 @@ var _ = Describe("Node Maintenance", func() {
 					nmCopy := nm.DeepCopy()
 					nmCopy.Status.Phase = nodemaintenanceapi.MaintenanceFailed
 					Expect(initMaintenanceStatus(nmCopy, r.drainer, r.Client)).To(Succeed())
-					// status was initialized but the function will fail on updating the CR status, since we don't create a nm CR here
+					// status was not initialized thus the function succeeds
 					Expect(nmCopy.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceFailed))
 					Expect(len(nmCopy.Status.PendingPods)).To(Equal(0))
 					Expect(nmCopy.Status.EvictionPods).To(Equal(0))
@@ -115,24 +115,24 @@ var _ = Describe("Node Maintenance", func() {
 
 		Context("Testing exclude remediation label", func() {
 			BeforeEach(func() {
-				Expect(k8sClient.Create(context.Background(), nodeOne)).To(Succeed())
-				DeferCleanup(k8sClient.Delete, context.Background(), nodeOne)
+				Expect(k8sClient.Create(ctx, nodeOne)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, ctx, nodeOne)
 			})
 			When("Adding and removing exclude remediation label", func() {
 				It("should keep the dummy label", func() {
 					node := &corev1.Node{}
-					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: taintedNodeName}, node)).To(Succeed())
+					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, node)).To(Succeed())
 					Expect(len(node.Labels)).To(Equal(1))
 					By("Adding exclude remediation label")
-					Expect(addExcludeRemediationLabel(context.Background(), node, r.Client, testLog)).To(Succeed())
+					Expect(addExcludeRemediationLabel(ctx, node, r.Client, testLog)).To(Succeed())
 					labeledNode := &corev1.Node{}
-					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: taintedNodeName}, labeledNode)).To(Succeed())
+					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, labeledNode)).To(Succeed())
 					Expect(isLabelExist(labeledNode, commonLabels.ExcludeFromRemediation)).To(BeTrue())
 					Expect(len(labeledNode.Labels)).To(Equal(2))
 					By("Removing exclude remediation label")
-					Expect(removeExcludeRemediationLabel(context.Background(), node, r.Client, testLog)).To(Succeed())
+					Expect(removeExcludeRemediationLabel(ctx, node, r.Client, testLog)).To(Succeed())
 					unlabeledNode := &corev1.Node{}
-					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: taintedNodeName}, unlabeledNode)).To(Succeed())
+					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, unlabeledNode)).To(Succeed())
 					Expect(isLabelExist(unlabeledNode, commonLabels.ExcludeFromRemediation)).To(BeFalse())
 					By("Finding dummy label")
 					Expect(isLabelExist(unlabeledNode, dummyLabelKey)).To(BeTrue())
@@ -142,23 +142,23 @@ var _ = Describe("Node Maintenance", func() {
 		})
 		Context("Testing Taints", func() {
 			BeforeEach(func() {
-				Expect(k8sClient.Create(context.Background(), nodeOne)).To(Succeed())
-				DeferCleanup(k8sClient.Delete, context.Background(), nodeOne)
+				Expect(k8sClient.Create(ctx, nodeOne)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, ctx, nodeOne)
 			})
 			When("Adding and then removing a taint", func() {
 				It("should keep the dummy taint", func() {
 					node := &corev1.Node{}
-					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: taintedNodeName}, node)).To(Succeed())
+					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, node)).To(Succeed())
 					Expect(isTaintExist(node, medik8sDrainTaint.Key, medik8sDrainTaint.Effect)).To(BeFalse())
 					By("Adding drain taint")
 					Expect(AddOrRemoveTaint(r.drainer.Client, node, true)).To(Succeed())
 					taintedNode := &corev1.Node{}
-					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: taintedNodeName}, taintedNode)).To(Succeed())
+					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, taintedNode)).To(Succeed())
 					Expect(isTaintExist(taintedNode, medik8sDrainTaint.Key, medik8sDrainTaint.Effect)).To(BeTrue())
 					By("Removing drain taint")
 					Expect(AddOrRemoveTaint(r.drainer.Client, taintedNode, false)).To(Succeed())
 					unTaintedNode := &corev1.Node{}
-					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: taintedNodeName}, unTaintedNode)).To(Succeed())
+					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, unTaintedNode)).To(Succeed())
 					Expect(isTaintExist(unTaintedNode, medik8sDrainTaint.Key, medik8sDrainTaint.Effect)).To(BeFalse())
 					By("Finding dummy taint")
 					Expect(isTaintExist(unTaintedNode, dummyTaintKey, corev1.TaintEffectPreferNoSchedule)).To(BeTrue())
@@ -170,14 +170,14 @@ var _ = Describe("Node Maintenance", func() {
 	Context("Reconciliation", func() {
 		var nm *nodemaintenanceapi.NodeMaintenance
 		BeforeEach(func() {
-			Expect(k8sClient.Create(context.Background(), nodeOne)).To(Succeed())
-			DeferCleanup(k8sClient.Delete, context.Background(), nodeOne)
+			Expect(k8sClient.Create(ctx, nodeOne)).To(Succeed())
+			DeferCleanup(k8sClient.Delete, ctx, nodeOne)
 
 			podOne, podTwo = getTestPod("test-pod-1", taintedNodeName), getTestPod("test-pod-2", taintedNodeName)
-			Expect(k8sClient.Create(context.Background(), podOne)).To(Succeed())
-			Expect(k8sClient.Create(context.Background(), podTwo)).To(Succeed())
-			DeferCleanup(cleanupPod, context.Background(), podOne)
-			DeferCleanup(cleanupPod, context.Background(), podTwo)
+			Expect(k8sClient.Create(ctx, podOne)).To(Succeed())
+			Expect(k8sClient.Create(ctx, podTwo)).To(Succeed())
+			DeferCleanup(cleanupPod, ctx, podOne)
+			DeferCleanup(cleanupPod, ctx, podTwo)
 		})
 		JustBeforeEach(func() {
 			// Sleep for a second to ensure dummy reconciliation has begun running before the unit tests
@@ -187,12 +187,12 @@ var _ = Describe("Node Maintenance", func() {
 		When("nm CR is valid", func() {
 			BeforeEach(func() {
 				nm = getTestNM("node-maintenance-cr", taintedNodeName)
-				Expect(k8sClient.Create(context.Background(), nm)).To(Succeed())
+				Expect(k8sClient.Create(ctx, nm)).To(Succeed())
 			})
 			It("should cordon node and add proper taints", func() {
 				By("check nm CR status was success")
 				maintenance := &nodemaintenanceapi.NodeMaintenance{}
-				Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
 
 				Expect(maintenance.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceSucceeded))
 				Expect(len(maintenance.Status.PendingPods)).To(Equal(0))
@@ -205,7 +205,7 @@ var _ = Describe("Node Maintenance", func() {
 
 				By("Check whether node was cordoned")
 				node := &corev1.Node{}
-				Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: nm.Spec.NodeName}, node)).To(Succeed())
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: nm.Spec.NodeName}, node)).To(Succeed())
 				Expect(node.Spec.Unschedulable).To(Equal(true))
 
 				By("Check node taints")
@@ -216,11 +216,11 @@ var _ = Describe("Node Maintenance", func() {
 				// Label added on CR creation
 				Expect(node.Labels[commonLabels.ExcludeFromRemediation]).To(Equal("true"))
 				// Re-fetch node after nm CR deletion
-				Expect(k8sClient.Delete(context.Background(), nm)).To(Succeed())
+				Expect(k8sClient.Delete(ctx, nm)).To(Succeed())
 				// Sleep for a second to ensure dummy reconciliation has begun running before the unit tests
 				time.Sleep(1 * time.Second)
 
-				Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: nm.Spec.NodeName}, node)).NotTo(HaveOccurred())
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: nm.Spec.NodeName}, node)).NotTo(HaveOccurred())
 				_, exist := node.Labels[commonLabels.ExcludeFromRemediation]
 				Expect(exist).To(BeFalse())
 			})
@@ -228,13 +228,13 @@ var _ = Describe("Node Maintenance", func() {
 		When("nm CR is invalid for a missing node", func() {
 			BeforeEach(func() {
 				nm = getTestNM("non-existing-node-cr", invalidNodeName)
-				Expect(k8sClient.Create(context.Background(), nm)).To(Succeed())
-				DeferCleanup(k8sClient.Delete, context.Background(), nm)
+				Expect(k8sClient.Create(ctx, nm)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, ctx, nm)
 			})
 			It("should fail on non existing node", func() {
 				By("check nm CR status and whether LastError was updated")
 				maintenance := &nodemaintenanceapi.NodeMaintenance{}
-				Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
 
 				Expect(maintenance.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceRunning))
 				Expect(len(maintenance.Status.PendingPods)).To(Equal(0))
@@ -321,7 +321,7 @@ func cleanupPod(ctx context.Context, pod *corev1.Pod) {
 		return
 	}
 	var force client.GracePeriodSeconds = 0
-	if err := k8sClient.Delete(context.Background(), pod, force); err != nil {
+	if err := k8sClient.Delete(ctx, pod, force); err != nil {
 		if !apierrors.IsNotFound(err) {
 			ConsistentlyWithOffset(1, func() error {
 				podErr := k8sClient.Get(ctx, client.ObjectKeyFromObject(pod), &corev1.Pod{})
