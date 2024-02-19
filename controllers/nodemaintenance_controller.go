@@ -138,7 +138,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return reconcile.Result{}, nil
 	}
 
-	err = r.initMaintenanceStatus(instance)
+	err = initMaintenanceStatus(instance, r.drainer, r.Client)
 	if err != nil {
 		r.logger.Error(err, "Failed to update NodeMaintenance with \"Running\" status")
 		return r.onReconcileError(instance, err)
@@ -152,7 +152,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return r.onReconcileError(instance, err)
 	}
 
-	r.setOwnerRefToNode(instance, node)
+	setOwnerRefToNode(instance, node, r.logger)
 
 	updateOwnedLeaseFailed, err := r.obtainLease(node)
 	if err != nil && updateOwnedLeaseFailed {
@@ -180,7 +180,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 	//Add exclude from remediation label
-	if err := r.addExcludeRemediationLabel(ctx, node); err != nil {
+	if err := addExcludeRemediationLabel(ctx, node, r.Client, r.logger); err != nil {
 		return r.onReconcileError(instance, err)
 	}
 
@@ -285,15 +285,15 @@ func initDrainer(r *NodeMaintenanceReconciler, config *rest.Config) error {
 	return nil
 }
 
-func (r *NodeMaintenanceReconciler) setOwnerRefToNode(instance *nodemaintenancev1beta1.NodeMaintenance, node *corev1.Node) {
+func setOwnerRefToNode(nm *nodemaintenancev1beta1.NodeMaintenance, node *corev1.Node, log logr.Logger) {
 
-	for _, ref := range instance.ObjectMeta.GetOwnerReferences() {
+	for _, ref := range nm.ObjectMeta.GetOwnerReferences() {
 		if ref.APIVersion == node.TypeMeta.APIVersion && ref.Kind == node.TypeMeta.Kind && ref.Name == node.ObjectMeta.GetName() && ref.UID == node.ObjectMeta.GetUID() {
 			return
 		}
 	}
 
-	r.logger.Info("setting owner ref to node")
+	log.Info("setting owner ref to node")
 
 	nodeMeta := node.TypeMeta
 	ref := metav1.OwnerReference{
@@ -305,7 +305,7 @@ func (r *NodeMaintenanceReconciler) setOwnerRefToNode(instance *nodemaintenancev
 		Controller:         pointer.Bool(false),
 	}
 
-	instance.ObjectMeta.SetOwnerReferences(append(instance.ObjectMeta.GetOwnerReferences(), ref))
+	nm.ObjectMeta.SetOwnerReferences(append(nm.ObjectMeta.GetOwnerReferences(), ref))
 }
 
 func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error) {
@@ -320,7 +320,7 @@ func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error)
 	return false, nil
 }
 
-func (r *NodeMaintenanceReconciler) addExcludeRemediationLabel(ctx context.Context, node *corev1.Node) error {
+func addExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client.Client, log logr.Logger) error {
 	if node.Labels[labels.ExcludeFromRemediation] != "true" {
 		patch := client.MergeFrom(node.DeepCopy())
 		if node.Labels == nil {
@@ -328,20 +328,20 @@ func (r *NodeMaintenanceReconciler) addExcludeRemediationLabel(ctx context.Conte
 		} else if node.Labels[labels.ExcludeFromRemediation] != "true" {
 			node.Labels[labels.ExcludeFromRemediation] = "true"
 		}
-		if err := r.Client.Patch(ctx, node, patch); err != nil {
-			r.logger.Error(err, "Failed to add exclude from remediation label from the node", "node name", node.Name)
+		if err := r.Patch(ctx, node, patch); err != nil {
+			log.Error(err, "Failed to add exclude from remediation label from the node", "node name", node.Name)
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *NodeMaintenanceReconciler) removeExcludeRemediationLabel(ctx context.Context, node *corev1.Node) error {
+func removeExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client.Client, log logr.Logger) error {
 	if node.Labels[labels.ExcludeFromRemediation] == "true" {
 		patch := client.MergeFrom(node.DeepCopy())
 		delete(node.Labels, labels.ExcludeFromRemediation)
-		if err := r.Client.Patch(ctx, node, patch); err != nil {
-			r.logger.Error(err, "Failed to remove exclude from remediation label from the node", "node name", node.Name)
+		if err := r.Patch(ctx, node, patch); err != nil {
+			log.Error(err, "Failed to remove exclude from remediation label from the node", "node name", node.Name)
 			return err
 		}
 	}
@@ -362,7 +362,7 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, 
 	if err := r.LeaseManager.InvalidateLease(ctx, node); err != nil {
 		return err
 	}
-	return r.removeExcludeRemediationLabel(ctx, node)
+	return removeExcludeRemediationLabel(ctx, node, r.Client, r.logger)
 }
 
 func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Context, nodeName string) error {
@@ -392,11 +392,11 @@ func (r *NodeMaintenanceReconciler) fetchNode(nodeName string) (*corev1.Node, er
 	return node, nil
 }
 
-func (r *NodeMaintenanceReconciler) initMaintenanceStatus(nm *nodemaintenancev1beta1.NodeMaintenance) error {
+func initMaintenanceStatus(nm *nodemaintenancev1beta1.NodeMaintenance, drainer *drain.Helper, r client.Client) error {
 	if nm.Status.Phase == "" {
 		nm.Status.Phase = nodemaintenancev1beta1.MaintenanceRunning
 		setLastUpdate(nm)
-		pendingList, errlist := r.drainer.GetPodsForDeletion(nm.Spec.NodeName)
+		pendingList, errlist := drainer.GetPodsForDeletion(nm.Spec.NodeName)
 		if errlist != nil {
 			return fmt.Errorf("failed to get pods for eviction while initializing status")
 		}
@@ -405,7 +405,7 @@ func (r *NodeMaintenanceReconciler) initMaintenanceStatus(nm *nodemaintenancev1b
 		}
 		nm.Status.EvictionPods = len(nm.Status.PendingPods)
 
-		podlist, err := r.drainer.Client.CoreV1().Pods(metav1.NamespaceAll).List(
+		podlist, err := drainer.Client.CoreV1().Pods(metav1.NamespaceAll).List(
 			context.Background(),
 			metav1.ListOptions{
 				FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nm.Spec.NodeName}).String(),
@@ -414,7 +414,7 @@ func (r *NodeMaintenanceReconciler) initMaintenanceStatus(nm *nodemaintenancev1b
 			return err
 		}
 		nm.Status.TotalPods = len(podlist.Items)
-		err = r.Client.Status().Update(context.TODO(), nm)
+		err = r.Status().Update(context.TODO(), nm)
 		return err
 	}
 	return nil
