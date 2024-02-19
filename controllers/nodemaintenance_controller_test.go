@@ -18,7 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nodemaintenanceapi "github.com/medik8s/node-maintenance-operator/api/v1beta1"
+	"github.com/medik8s/node-maintenance-operator/api/v1beta1"
 )
 
 const (
@@ -52,7 +52,7 @@ var _ = Describe("Node Maintenance", func() {
 	})
 	Context("Functionality test", func() {
 		Context("Testing initMaintenanceStatus", func() {
-			var nm *nodemaintenanceapi.NodeMaintenance
+			var nm *v1beta1.NodeMaintenance
 			BeforeEach(func() {
 				Expect(k8sClient.Create(ctx, nodeOne)).To(Succeed())
 				DeferCleanup(k8sClient.Delete, ctx, nodeOne)
@@ -68,7 +68,7 @@ var _ = Describe("Node Maintenance", func() {
 				It("should be set for running with 2 pods to drain", func() {
 					Expect(initMaintenanceStatus(nm, r.drainer, r.Client)).To(HaveOccurred())
 					// status was initialized but the function will fail on updating the CR status, since we don't create a nm CR here
-					Expect(nm.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceRunning))
+					Expect(nm.Status.Phase).To(Equal(v1beta1.MaintenanceRunning))
 					Expect(len(nm.Status.PendingPods)).To(Equal(2))
 					Expect(nm.Status.EvictionPods).To(Equal(2))
 					Expect(nm.Status.TotalPods).To(Equal(2))
@@ -92,7 +92,7 @@ var _ = Describe("Node Maintenance", func() {
 					Expect(ref.Kind).To(Equal(node.TypeMeta.Kind))
 
 					By("Setting owner ref for an empty nm CR")
-					maintenance := &nodemaintenanceapi.NodeMaintenance{}
+					maintenance := &v1beta1.NodeMaintenance{}
 					setOwnerRefToNode(maintenance, node, r.logger)
 					Expect(maintenance.ObjectMeta.GetOwnerReferences()).To(HaveLen(1))
 				})
@@ -100,10 +100,10 @@ var _ = Describe("Node Maintenance", func() {
 			When("Node Maintenance CR was initalized", func() {
 				It("Should not modify the CR after initalization", func() {
 					nmCopy := nm.DeepCopy()
-					nmCopy.Status.Phase = nodemaintenanceapi.MaintenanceFailed
+					nmCopy.Status.Phase = v1beta1.MaintenanceFailed
 					Expect(initMaintenanceStatus(nmCopy, r.drainer, r.Client)).To(Succeed())
 					// status was not initialized thus the function succeeds
-					Expect(nmCopy.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceFailed))
+					Expect(nmCopy.Status.Phase).To(Equal(v1beta1.MaintenanceFailed))
 					Expect(len(nmCopy.Status.PendingPods)).To(Equal(0))
 					Expect(nmCopy.Status.EvictionPods).To(Equal(0))
 					Expect(nmCopy.Status.TotalPods).To(Equal(0))
@@ -168,7 +168,7 @@ var _ = Describe("Node Maintenance", func() {
 	})
 
 	Context("Reconciliation", func() {
-		var nm *nodemaintenanceapi.NodeMaintenance
+		var nm *v1beta1.NodeMaintenance
 		BeforeEach(func() {
 			Expect(k8sClient.Create(ctx, nodeOne)).To(Succeed())
 			DeferCleanup(k8sClient.Delete, ctx, nodeOne)
@@ -191,10 +191,10 @@ var _ = Describe("Node Maintenance", func() {
 			})
 			It("should cordon node and add proper taints", func() {
 				By("check nm CR status was success")
-				maintenance := &nodemaintenanceapi.NodeMaintenance{}
+				maintenance := &v1beta1.NodeMaintenance{}
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
 
-				Expect(maintenance.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceSucceeded))
+				Expect(maintenance.Status.Phase).To(Equal(v1beta1.MaintenanceSucceeded))
 				Expect(len(maintenance.Status.PendingPods)).To(Equal(0))
 				Expect(maintenance.Status.EvictionPods).To(Equal(2))
 				Expect(maintenance.Status.TotalPods).To(Equal(2))
@@ -233,10 +233,10 @@ var _ = Describe("Node Maintenance", func() {
 			})
 			It("should fail on non existing node", func() {
 				By("check nm CR status and whether LastError was updated")
-				maintenance := &nodemaintenanceapi.NodeMaintenance{}
+				maintenance := &v1beta1.NodeMaintenance{}
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
 
-				Expect(maintenance.Status.Phase).To(Equal(nodemaintenanceapi.MaintenanceRunning))
+				Expect(maintenance.Status.Phase).To(Equal(v1beta1.MaintenanceRunning))
 				Expect(len(maintenance.Status.PendingPods)).To(Equal(0))
 				Expect(maintenance.Status.EvictionPods).To(Equal(0))
 				Expect(maintenance.Status.TotalPods).To(Equal(0))
@@ -335,12 +335,12 @@ func cleanupPod(ctx context.Context, pod *corev1.Pod) {
 	}
 }
 
-func getTestNM(crName, nodeName string) *nodemaintenanceapi.NodeMaintenance {
-	return &nodemaintenanceapi.NodeMaintenance{
+func getTestNM(crName, nodeName string) *v1beta1.NodeMaintenance {
+	return &v1beta1.NodeMaintenance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: crName,
 		},
-		Spec: nodemaintenanceapi.NodeMaintenanceSpec{
+		Spec: v1beta1.NodeMaintenanceSpec{
 			NodeName: nodeName,
 			Reason:   "test reason",
 		},
