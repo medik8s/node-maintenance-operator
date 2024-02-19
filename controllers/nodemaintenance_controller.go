@@ -38,6 +38,7 @@ import (
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -110,31 +111,27 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Add finalizer when object is created
-	if nm.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !ContainsString(nm.ObjectMeta.Finalizers, v1beta1.NodeMaintenanceFinalizer) {
-			nm.ObjectMeta.Finalizers = append(nm.ObjectMeta.Finalizers, v1beta1.NodeMaintenanceFinalizer)
-			if err := r.Client.Update(context.TODO(), nm); err != nil {
+	if !controllerutil.ContainsFinalizer(nm, v1beta1.NodeMaintenanceFinalizer) && nm.ObjectMeta.DeletionTimestamp.IsZero() {
+		controllerutil.AddFinalizer(nm, v1beta1.NodeMaintenanceFinalizer)
+		if err := r.Client.Update(context.TODO(), nm); err != nil {
+			return r.onReconcileError(nm, err)
+		}
+	} else if controllerutil.ContainsFinalizer(nm, v1beta1.NodeMaintenanceFinalizer) && !nm.ObjectMeta.DeletionTimestamp.IsZero() {
+		// The object is being deleted
+		r.logger.Info("Deletion timestamp not zero")
+
+		// Stop node maintenance - uncordon and remove live migration taint from the node.
+		if err := r.stopNodeMaintenanceOnDeletion(ctx, nm.Spec.NodeName); err != nil {
+			r.logger.Error(err, "error stopping node maintenance")
+			if !errors.IsNotFound(err) {
 				return r.onReconcileError(nm, err)
 			}
 		}
-	} else {
-		r.logger.Info("Deletion timestamp not zero")
 
-		// The object is being deleted
-		if ContainsString(nm.ObjectMeta.Finalizers, v1beta1.NodeMaintenanceFinalizer) || ContainsString(nm.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
-			// Stop node maintenance - uncordon and remove live migration taint from the node.
-			if err := r.stopNodeMaintenanceOnDeletion(ctx, nm.Spec.NodeName); err != nil {
-				r.logger.Error(err, "error stopping node maintenance")
-				if !errors.IsNotFound(err) {
-					return r.onReconcileError(nm, err)
-				}
-			}
-
-			// Remove our finalizer from the list and update it.
-			nm.ObjectMeta.Finalizers = RemoveString(nm.ObjectMeta.Finalizers, v1beta1.NodeMaintenanceFinalizer)
-			if err := r.Client.Update(context.Background(), nm); err != nil {
-				return r.onReconcileError(nm, err)
-			}
+		// Remove finalizer
+		controllerutil.RemoveFinalizer(nm, v1beta1.NodeMaintenanceFinalizer)
+		if err := r.Client.Update(context.Background(), nm); err != nil {
+			return r.onReconcileError(nm, err)
 		}
 		return reconcile.Result{}, nil
 	}
