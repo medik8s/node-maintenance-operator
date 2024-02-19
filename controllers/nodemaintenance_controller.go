@@ -35,12 +35,11 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/drain"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/medik8s/node-maintenance-operator/api/v1beta1"
 )
@@ -93,6 +92,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	r.logger = log.FromContext(ctx)
 	r.logger.Info("Reconciling NodeMaintenance")
 	defer r.logger.Info("Reconcile completed")
+	emptyResult := ctrl.Result{}
 
 	// Fetch the NodeMaintenance instance (nm)
 	nm := &v1beta1.NodeMaintenance{}
@@ -103,11 +103,11 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
 			r.logger.Info("NodeMaintenance not found", "name", req.NamespacedName)
-			return reconcile.Result{}, nil
+			return emptyResult, nil
 		}
 		// Error reading the object - requeue the request.
 		r.logger.Info("Error reading the request object, requeuing.")
-		return reconcile.Result{}, err
+		return emptyResult, err
 	}
 
 	// Add finalizer when object is created
@@ -133,7 +133,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if err := r.Client.Update(context.Background(), nm); err != nil {
 			return r.onReconcileError(nm, err)
 		}
-		return reconcile.Result{}, nil
+		return emptyResult, nil
 	}
 
 	err = initMaintenanceStatus(nm, r.drainer, r.Client)
@@ -212,7 +212,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	r.logger.Info("Maintenance was completed - all pods were evicted", "nodeName", nodeName)
-	return reconcile.Result{}, nil
+	return emptyResult, nil
 
 }
 
@@ -298,8 +298,8 @@ func setOwnerRefToNode(nm *v1beta1.NodeMaintenance, node *corev1.Node, log logr.
 		Kind:               nodeMeta.Kind,
 		Name:               node.ObjectMeta.GetName(),
 		UID:                node.ObjectMeta.GetUID(),
-		BlockOwnerDeletion: pointer.Bool(false),
-		Controller:         pointer.Bool(false),
+		BlockOwnerDeletion: ptr.To[bool](false),
+		Controller:         ptr.To[bool](false),
 	}
 
 	nm.ObjectMeta.SetOwnerReferences(append(nm.ObjectMeta.GetOwnerReferences(), ref))
@@ -417,7 +417,7 @@ func initMaintenanceStatus(nm *v1beta1.NodeMaintenance, drainer *drain.Helper, r
 	return nil
 }
 
-func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(nm *v1beta1.NodeMaintenance, err error, duration *time.Duration) (reconcile.Result, error) {
+func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(nm *v1beta1.NodeMaintenance, err error, duration *time.Duration) (ctrl.Result, error) {
 	nm.Status.LastError = err.Error()
 	setLastUpdate(nm)
 
@@ -437,13 +437,13 @@ func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(nm *v1beta1.Node
 	}
 	if duration != nil {
 		r.logger.Info(FixedDurationReconcileLog)
-		return reconcile.Result{RequeueAfter: *duration}, nil
+		return ctrl.Result{RequeueAfter: *duration}, nil
 	}
 	r.logger.Info("Reconciling with exponential duration")
-	return reconcile.Result{}, err
+	return ctrl.Result{}, err
 }
 
-func (r *NodeMaintenanceReconciler) onReconcileError(nm *v1beta1.NodeMaintenance, err error) (reconcile.Result, error) {
+func (r *NodeMaintenanceReconciler) onReconcileError(nm *v1beta1.NodeMaintenance, err error) (ctrl.Result, error) {
 	return r.onReconcileErrorWithRequeue(nm, err, nil)
 
 }
