@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/medik8s/common/pkg/labels"
+	commonLabels "github.com/medik8s/common/pkg/labels"
 	"github.com/medik8s/common/pkg/lease"
 
 	corev1 "k8s.io/api/core/v1"
@@ -91,6 +91,7 @@ type NodeMaintenanceReconciler struct {
 func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.logger = log.FromContext(ctx)
 	r.logger.Info("Reconciling NodeMaintenance")
+	defer r.logger.Info("Reconcile completed")
 
 	// Fetch the NodeMaintenance instance
 	instance := &nodemaintenancev1beta1.NodeMaintenance{}
@@ -124,7 +125,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			// Stop node maintenance - uncordon and remove live migration taint from the node.
 			if err := r.stopNodeMaintenanceOnDeletion(ctx, instance.Spec.NodeName); err != nil {
 				r.logger.Error(err, "error stopping node maintenance")
-				if errors.IsNotFound(err) == false {
+				if !errors.IsNotFound(err) {
 					return r.onReconcileError(instance, err)
 				}
 			}
@@ -163,7 +164,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			// Uncordon the node
 			err = r.stopNodeMaintenanceImp(ctx, node)
 			if err != nil {
-				return r.onReconcileError(instance, fmt.Errorf("Failed to uncordon upon failure to obtain owned lease : %v ", err))
+				return r.onReconcileError(instance, fmt.Errorf("failed to uncordon upon failure to obtain owned lease : %v ", err))
 			}
 			instance.Status.Phase = nodemaintenancev1beta1.MaintenanceFailed
 		}
@@ -179,7 +180,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		}
 	}
-	//Add exclude from remediation label
+
 	if err := addExcludeRemediationLabel(ctx, node, r.Client, r.logger); err != nil {
 		return r.onReconcileError(instance, err)
 	}
@@ -203,7 +204,6 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	} else if instance.Status.Phase != nodemaintenancev1beta1.MaintenanceSucceeded {
 		setLastUpdate(instance)
 	}
-	r.logger.Info("All pods evicted", "nodeName", nodeName)
 
 	instance.Status.Phase = nodemaintenancev1beta1.MaintenanceSucceeded
 	instance.Status.DrainProgress = 100
@@ -213,8 +213,8 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		r.logger.Error(err, "Failed to update NodeMaintenance with \"Succeeded\" status")
 		return r.onReconcileError(instance, err)
 	}
-	r.logger.Info("Reconcile completed", "nodeName", nodeName)
 
+	r.logger.Info("Maintenance was completed - all pods were evicted", "nodeName", nodeName)
 	return reconcile.Result{}, nil
 
 }
@@ -321,12 +321,12 @@ func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error)
 }
 
 func addExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client.Client, log logr.Logger) error {
-	if node.Labels[labels.ExcludeFromRemediation] != "true" {
+	if node.Labels[commonLabels.ExcludeFromRemediation] != "true" {
 		patch := client.MergeFrom(node.DeepCopy())
 		if node.Labels == nil {
-			node.Labels = map[string]string{labels.ExcludeFromRemediation: "true"}
-		} else if node.Labels[labels.ExcludeFromRemediation] != "true" {
-			node.Labels[labels.ExcludeFromRemediation] = "true"
+			node.Labels = map[string]string{commonLabels.ExcludeFromRemediation: "true"}
+		} else if node.Labels[commonLabels.ExcludeFromRemediation] != "true" {
+			node.Labels[commonLabels.ExcludeFromRemediation] = "true"
 		}
 		if err := r.Patch(ctx, node, patch); err != nil {
 			log.Error(err, "Failed to add exclude from remediation label from the node", "node name", node.Name)
@@ -337,9 +337,9 @@ func addExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client
 }
 
 func removeExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client.Client, log logr.Logger) error {
-	if node.Labels[labels.ExcludeFromRemediation] == "true" {
+	if node.Labels[commonLabels.ExcludeFromRemediation] == "true" {
 		patch := client.MergeFrom(node.DeepCopy())
-		delete(node.Labels, labels.ExcludeFromRemediation)
+		delete(node.Labels, commonLabels.ExcludeFromRemediation)
 		if err := r.Patch(ctx, node, patch); err != nil {
 			log.Error(err, "Failed to remove exclude from remediation label from the node", "node name", node.Name)
 			return err

@@ -210,7 +210,7 @@ var _ = Describe("Node Maintenance", func() {
 
 				By("Check node taints")
 				Expect(isTaintExist(node, medik8sDrainTaint.Key, corev1.TaintEffectNoSchedule)).To(BeTrue())
-				Expect(isTaintExist(node, NodeUnschedulableTaint.Key, corev1.TaintEffectNoSchedule)).To(BeTrue())
+				Expect(isTaintExist(node, nodeUnschedulableTaint.Key, corev1.TaintEffectNoSchedule)).To(BeTrue())
 
 				By("Check add/remove Exclude remediation label")
 				// Label added on CR creation
