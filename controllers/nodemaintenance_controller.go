@@ -96,7 +96,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Fetch the NodeMaintenance instance (nm)
 	nm := &v1beta1.NodeMaintenance{}
-	err := r.Client.Get(context.TODO(), req.NamespacedName, nm)
+	err := r.Client.Get(ctx, req.NamespacedName, nm)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -113,8 +113,8 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Add finalizer when object is created
 	if !controllerutil.ContainsFinalizer(nm, v1beta1.NodeMaintenanceFinalizer) && nm.ObjectMeta.DeletionTimestamp.IsZero() {
 		controllerutil.AddFinalizer(nm, v1beta1.NodeMaintenanceFinalizer)
-		if err := r.Client.Update(context.TODO(), nm); err != nil {
-			return r.onReconcileError(nm, err)
+		if err := r.Client.Update(ctx, nm); err != nil {
+			return r.onReconcileError(nm, ctx, err)
 		}
 	} else if controllerutil.ContainsFinalizer(nm, v1beta1.NodeMaintenanceFinalizer) && !nm.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is being deleted
@@ -124,52 +124,52 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if err := r.stopNodeMaintenanceOnDeletion(ctx, nm.Spec.NodeName); err != nil {
 			r.logger.Error(err, "error stopping node maintenance")
 			if !errors.IsNotFound(err) {
-				return r.onReconcileError(nm, err)
+				return r.onReconcileError(nm, ctx, err)
 			}
 		}
 
 		// Remove finalizer
 		controllerutil.RemoveFinalizer(nm, v1beta1.NodeMaintenanceFinalizer)
-		if err := r.Client.Update(context.Background(), nm); err != nil {
-			return r.onReconcileError(nm, err)
+		if err := r.Client.Update(ctx, nm); err != nil {
+			return r.onReconcileError(nm, ctx, err)
 		}
 		return emptyResult, nil
 	}
 
-	err = initMaintenanceStatus(nm, r.drainer, r.Client)
+	err = initMaintenanceStatus(nm, r.drainer, ctx, r.Client)
 	if err != nil {
 		r.logger.Error(err, "Failed to update NodeMaintenance with \"Running\" status")
-		return r.onReconcileError(nm, err)
+		return r.onReconcileError(nm, ctx, err)
 	}
 
 	nodeName := nm.Spec.NodeName
 
 	r.logger.Info("Applying maintenance mode", "node", nodeName, "reason", nm.Spec.Reason)
-	node, err := r.fetchNode(nodeName)
+	node, err := r.fetchNode(ctx, nodeName)
 	if err != nil {
-		return r.onReconcileError(nm, err)
+		return r.onReconcileError(nm, ctx, err)
 	}
 
 	setOwnerRefToNode(nm, node, r.logger)
 
-	updateOwnedLeaseFailed, err := r.obtainLease(node)
+	updateOwnedLeaseFailed, err := r.obtainLease(ctx, node)
 	if err != nil && updateOwnedLeaseFailed {
 		nm.Status.ErrorOnLeaseCount += 1
 		if nm.Status.ErrorOnLeaseCount > maxAllowedErrorToUpdateOwnedLease {
 			r.logger.Info("can't extend owned lease. uncordon for now")
 
 			// Uncordon the node
-			err = r.stopNodeMaintenanceImp(ctx, node)
+			err = r.stopNodeMaintenanceImp(node, ctx)
 			if err != nil {
-				return r.onReconcileError(nm, fmt.Errorf("failed to uncordon upon failure to obtain owned lease : %v ", err))
+				return r.onReconcileError(nm, ctx, fmt.Errorf("failed to uncordon upon failure to obtain owned lease : %v ", err))
 			}
 			nm.Status.Phase = v1beta1.MaintenanceFailed
 		}
-		return r.onReconcileError(nm, fmt.Errorf("failed to extend lease owned by us : %v errorOnLeaseCount %d", err, nm.Status.ErrorOnLeaseCount))
+		return r.onReconcileError(nm, ctx, fmt.Errorf("failed to extend lease owned by us : %v errorOnLeaseCount %d", err, nm.Status.ErrorOnLeaseCount))
 	}
 	if err != nil {
 		nm.Status.ErrorOnLeaseCount = 0
-		return r.onReconcileError(nm, err)
+		return r.onReconcileError(nm, ctx, err)
 	} else {
 		if nm.Status.Phase != v1beta1.MaintenanceRunning || nm.Status.ErrorOnLeaseCount != 0 {
 			nm.Status.Phase = v1beta1.MaintenanceRunning
@@ -178,18 +178,18 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	if err := addExcludeRemediationLabel(ctx, node, r.Client, r.logger); err != nil {
-		return r.onReconcileError(nm, err)
+	if err := addExcludeRemediationLabel(node, r.Client, ctx, r.logger); err != nil {
+		return r.onReconcileError(nm, ctx, err)
 	}
 
 	// Cordon node
-	err = AddOrRemoveTaint(r.drainer.Client, node, true)
+	err = AddOrRemoveTaint(r.drainer.Client, true, node, ctx)
 	if err != nil {
-		return r.onReconcileError(nm, err)
+		return r.onReconcileError(nm, ctx, err)
 	}
 
 	if err = drain.RunCordonOrUncordon(r.drainer, node, true); err != nil {
-		return r.onReconcileError(nm, err)
+		return r.onReconcileError(nm, ctx, err)
 	}
 
 	r.logger.Info("Evict all Pods from Node", "nodeName", nodeName)
@@ -197,7 +197,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err = drain.RunNodeDrain(r.drainer, nodeName); err != nil {
 		r.logger.Info("Not all pods evicted", "nodeName", nodeName, "error", err)
 		waitOnReconcile := waitDurationOnDrainError
-		return r.onReconcileErrorWithRequeue(nm, err, &waitOnReconcile)
+		return r.onReconcileErrorWithRequeue(nm, ctx, err, &waitOnReconcile)
 	} else if nm.Status.Phase != v1beta1.MaintenanceSucceeded {
 		setLastUpdate(nm)
 	}
@@ -205,10 +205,10 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	nm.Status.Phase = v1beta1.MaintenanceSucceeded
 	nm.Status.DrainProgress = 100
 	nm.Status.PendingPods = nil
-	err = r.Client.Status().Update(context.TODO(), nm)
+	err = r.Client.Status().Update(ctx, nm)
 	if err != nil {
 		r.logger.Error(err, "Failed to update NodeMaintenance with \"Succeeded\" status")
-		return r.onReconcileError(nm, err)
+		return r.onReconcileError(nm, ctx, err)
 	}
 
 	r.logger.Info("Maintenance was completed - all pods were evicted", "nodeName", nodeName)
@@ -217,8 +217,8 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *NodeMaintenanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := initDrainer(r, mgr.GetConfig()); err != nil {
+func (r *NodeMaintenanceReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	if err := initDrainer(r, mgr.GetConfig(), ctx); err != nil {
 		return err
 	}
 
@@ -227,18 +227,7 @@ func (r *NodeMaintenanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func onPodDeletedOrEvicted(pod *corev1.Pod, usingEviction bool) {
-	var verbString string
-	if usingEviction {
-		verbString = "Evicted"
-	} else {
-		verbString = "Deleted"
-	}
-	msg := fmt.Sprintf("pod: %s:%s %s from node: %s", pod.ObjectMeta.Namespace, pod.ObjectMeta.Name, verbString, pod.Spec.NodeName)
-	klog.Info(msg)
-}
-
-func initDrainer(r *NodeMaintenanceReconciler, config *rest.Config) error {
+func initDrainer(r *NodeMaintenanceReconciler, config *rest.Config, ctx context.Context) error {
 
 	r.drainer = &drain.Helper{}
 
@@ -274,11 +263,22 @@ func initDrainer(r *NodeMaintenanceReconciler, config *rest.Config) error {
 	}
 	r.drainer.Client = cs
 	r.drainer.DryRunStrategy = util.DryRunNone
-	r.drainer.Ctx = context.Background()
+	r.drainer.Ctx = ctx
 
 	r.drainer.Out = writer{klog.Info}
 	r.drainer.ErrOut = writer{klog.Error}
-	r.drainer.OnPodDeletedOrEvicted = onPodDeletedOrEvicted
+
+	// OnPodDeletedOrEvicted function is called when a pod is evicted/deleted; for printing progress output
+	r.drainer.OnPodDeletedOrEvicted = func(pod *corev1.Pod, usingEviction bool) {
+		var verbString string
+		if usingEviction {
+			verbString = "Evicted"
+		} else {
+			verbString = "Deleted"
+		}
+		msg := fmt.Sprintf("pod: %s:%s %s from node: %s", pod.ObjectMeta.Namespace, pod.ObjectMeta.Name, verbString, pod.Spec.NodeName)
+		klog.Info(msg)
+	}
 	return nil
 }
 
@@ -305,9 +305,9 @@ func setOwnerRefToNode(nm *v1beta1.NodeMaintenance, node *corev1.Node, log logr.
 	nm.ObjectMeta.SetOwnerReferences(append(nm.ObjectMeta.GetOwnerReferences(), ref))
 }
 
-func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error) {
+func (r *NodeMaintenanceReconciler) obtainLease(ctx context.Context, node *corev1.Node) (bool, error) {
 	r.logger.Info("Lease object supported, obtaining lease")
-	err := r.LeaseManager.RequestLease(context.Background(), node, LeaseDuration)
+	err := r.LeaseManager.RequestLease(ctx, node, LeaseDuration)
 
 	if err != nil {
 		r.logger.Error(err, "failed to create or get existing lease")
@@ -317,7 +317,7 @@ func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error)
 	return false, nil
 }
 
-func addExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client.Client, log logr.Logger) error {
+func addExcludeRemediationLabel(node *corev1.Node, r client.Client, ctx context.Context, log logr.Logger) error {
 	if node.Labels[commonLabels.ExcludeFromRemediation] != "true" {
 		patch := client.MergeFrom(node.DeepCopy())
 		if node.Labels == nil {
@@ -333,7 +333,7 @@ func addExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client
 	return nil
 }
 
-func removeExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client.Client, log logr.Logger) error {
+func removeExcludeRemediationLabel(node *corev1.Node, r client.Client, ctx context.Context, log logr.Logger) error {
 	if node.Labels[commonLabels.ExcludeFromRemediation] == "true" {
 		patch := client.MergeFrom(node.DeepCopy())
 		delete(node.Labels, commonLabels.ExcludeFromRemediation)
@@ -345,9 +345,9 @@ func removeExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r cli
 	return nil
 }
 
-func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, node *corev1.Node) error {
+func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(node *corev1.Node, ctx context.Context) error {
 	// Uncordon the node
-	err := AddOrRemoveTaint(r.drainer.Client, node, false)
+	err := AddOrRemoveTaint(r.drainer.Client, false, node, ctx)
 	if err != nil {
 		return err
 	}
@@ -359,11 +359,11 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, 
 	if err := r.LeaseManager.InvalidateLease(ctx, node); err != nil {
 		return err
 	}
-	return removeExcludeRemediationLabel(ctx, node, r.Client, r.logger)
+	return removeExcludeRemediationLabel(node, r.Client, ctx, r.logger)
 }
 
 func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Context, nodeName string) error {
-	node, err := r.fetchNode(nodeName)
+	node, err := r.fetchNode(ctx, nodeName)
 	if err != nil {
 		// if CR is gathered as result of garbage collection: the node may have been deleted, but the CR has not yet been deleted, still we must clean up the lease!
 		if errors.IsNotFound(err) {
@@ -374,11 +374,11 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Co
 		}
 		return err
 	}
-	return r.stopNodeMaintenanceImp(ctx, node)
+	return r.stopNodeMaintenanceImp(node, ctx)
 }
 
-func (r *NodeMaintenanceReconciler) fetchNode(nodeName string) (*corev1.Node, error) {
-	node, err := r.drainer.Client.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+func (r *NodeMaintenanceReconciler) fetchNode(ctx context.Context, nodeName string) (*corev1.Node, error) {
+	node, err := r.drainer.Client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	if err != nil && errors.IsNotFound(err) {
 		r.logger.Error(err, "Node cannot be found", "nodeName", nodeName)
 		return nil, err
@@ -389,7 +389,7 @@ func (r *NodeMaintenanceReconciler) fetchNode(nodeName string) (*corev1.Node, er
 	return node, nil
 }
 
-func initMaintenanceStatus(nm *v1beta1.NodeMaintenance, drainer *drain.Helper, r client.Client) error {
+func initMaintenanceStatus(nm *v1beta1.NodeMaintenance, drainer *drain.Helper, ctx context.Context, r client.Client) error {
 	if nm.Status.Phase == "" {
 		nm.Status.Phase = v1beta1.MaintenanceRunning
 		setLastUpdate(nm)
@@ -403,7 +403,7 @@ func initMaintenanceStatus(nm *v1beta1.NodeMaintenance, drainer *drain.Helper, r
 		nm.Status.EvictionPods = len(nm.Status.PendingPods)
 
 		podlist, err := drainer.Client.CoreV1().Pods(metav1.NamespaceAll).List(
-			context.Background(),
+			ctx,
 			metav1.ListOptions{
 				FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nm.Spec.NodeName}).String(),
 			})
@@ -411,13 +411,13 @@ func initMaintenanceStatus(nm *v1beta1.NodeMaintenance, drainer *drain.Helper, r
 			return err
 		}
 		nm.Status.TotalPods = len(podlist.Items)
-		err = r.Status().Update(context.TODO(), nm)
+		err = r.Status().Update(ctx, nm)
 		return err
 	}
 	return nil
 }
 
-func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(nm *v1beta1.NodeMaintenance, err error, duration *time.Duration) (ctrl.Result, error) {
+func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(nm *v1beta1.NodeMaintenance, ctx context.Context, err error, duration *time.Duration) (ctrl.Result, error) {
 	nm.Status.LastError = err.Error()
 	setLastUpdate(nm)
 
@@ -431,7 +431,7 @@ func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(nm *v1beta1.Node
 		}
 	}
 
-	updateErr := r.Client.Status().Update(context.TODO(), nm)
+	updateErr := r.Client.Status().Update(ctx, nm)
 	if updateErr != nil {
 		r.logger.Error(updateErr, "Failed to update NodeMaintenance with \"Failed\" status")
 	}
@@ -443,9 +443,8 @@ func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(nm *v1beta1.Node
 	return ctrl.Result{}, err
 }
 
-func (r *NodeMaintenanceReconciler) onReconcileError(nm *v1beta1.NodeMaintenance, err error) (ctrl.Result, error) {
-	return r.onReconcileErrorWithRequeue(nm, err, nil)
-
+func (r *NodeMaintenanceReconciler) onReconcileError(nm *v1beta1.NodeMaintenance, ctx context.Context, err error) (ctrl.Result, error) {
+	return r.onReconcileErrorWithRequeue(nm, ctx, err, nil)
 }
 
 func setLastUpdate(nm *v1beta1.NodeMaintenance) {

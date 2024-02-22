@@ -29,8 +29,7 @@ var nodeUnschedulableTaint = &corev1.Taint{
 }
 var maintenanceTaints = []corev1.Taint{*nodeUnschedulableTaint, *medik8sDrainTaint}
 
-func AddOrRemoveTaint(clientset kubernetes.Interface, node *corev1.Node, add bool) error {
-
+func AddOrRemoveTaint(clientset kubernetes.Interface, add bool, node *corev1.Node, ctx context.Context) error {
 	taintStr := ""
 	patch := ""
 	client := clientset.CoreV1().Nodes()
@@ -70,7 +69,7 @@ func AddOrRemoveTaint(clientset kubernetes.Interface, node *corev1.Node, add boo
 
 	test := fmt.Sprintf(`{ "op": "test", "path": "/spec/taints", "value": %s }`, string(oldTaints))
 	log.Infof("Patching taints on Node: %s", node.Name)
-	_, err = client.Patch(context.Background(), node.Name, types.JSONPatchType, []byte(fmt.Sprintf("[ %s, %s ]", test, patch)), v1.PatchOptions{})
+	_, err = client.Patch(ctx, node.Name, types.JSONPatchType, []byte(fmt.Sprintf("[ %s, %s ]", test, patch)), v1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("patching node taints failed: %v", err)
 	}

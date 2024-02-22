@@ -127,7 +127,7 @@ func main() {
 		Client:       cl,
 		Scheme:       mgr.GetScheme(),
 		LeaseManager: leaseManagerInitializer,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(context.TODO(), mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeMaintenance")
 		os.Exit(1)
 	}

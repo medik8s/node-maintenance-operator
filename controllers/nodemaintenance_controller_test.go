@@ -66,7 +66,7 @@ var _ = Describe("Node Maintenance", func() {
 			})
 			When("Status was initalized", func() {
 				It("should be set for running with 2 pods to drain", func() {
-					Expect(initMaintenanceStatus(nm, r.drainer, r.Client)).To(HaveOccurred())
+					Expect(initMaintenanceStatus(nm, r.drainer, ctx, r.Client)).To(HaveOccurred())
 					// status was initialized but the function will fail on updating the CR status, since we don't create a nm CR here
 					Expect(nm.Status.Phase).To(Equal(v1beta1.MaintenanceRunning))
 					Expect(len(nm.Status.PendingPods)).To(Equal(2))
@@ -78,7 +78,7 @@ var _ = Describe("Node Maintenance", func() {
 			})
 			When("Owner ref was set", func() {
 				It("should be set properly", func() {
-					Expect(initMaintenanceStatus(nm, r.drainer, r.Client)).To(HaveOccurred())
+					Expect(initMaintenanceStatus(nm, r.drainer, ctx, r.Client)).To(HaveOccurred())
 					// status was initialized but the function will fail on updating the CR status, since we don't create a nm CR here
 					By("Setting owner ref for a modified nm CR")
 					node := &corev1.Node{}
@@ -101,7 +101,7 @@ var _ = Describe("Node Maintenance", func() {
 				It("Should not modify the CR after initalization", func() {
 					nmCopy := nm.DeepCopy()
 					nmCopy.Status.Phase = v1beta1.MaintenanceFailed
-					Expect(initMaintenanceStatus(nmCopy, r.drainer, r.Client)).To(Succeed())
+					Expect(initMaintenanceStatus(nmCopy, r.drainer, ctx, r.Client)).To(Succeed())
 					// status was not initialized thus the function succeeds
 					Expect(nmCopy.Status.Phase).To(Equal(v1beta1.MaintenanceFailed))
 					Expect(len(nmCopy.Status.PendingPods)).To(Equal(0))
@@ -124,13 +124,13 @@ var _ = Describe("Node Maintenance", func() {
 					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, node)).To(Succeed())
 					Expect(len(node.Labels)).To(Equal(1))
 					By("Adding exclude remediation label")
-					Expect(addExcludeRemediationLabel(ctx, node, r.Client, testLog)).To(Succeed())
+					Expect(addExcludeRemediationLabel(node, r.Client, ctx, testLog)).To(Succeed())
 					labeledNode := &corev1.Node{}
 					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, labeledNode)).To(Succeed())
 					Expect(isLabelExist(labeledNode, commonLabels.ExcludeFromRemediation)).To(BeTrue())
 					Expect(len(labeledNode.Labels)).To(Equal(2))
 					By("Removing exclude remediation label")
-					Expect(removeExcludeRemediationLabel(ctx, node, r.Client, testLog)).To(Succeed())
+					Expect(removeExcludeRemediationLabel(node, r.Client, ctx, testLog)).To(Succeed())
 					unlabeledNode := &corev1.Node{}
 					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, unlabeledNode)).To(Succeed())
 					Expect(isLabelExist(unlabeledNode, commonLabels.ExcludeFromRemediation)).To(BeFalse())
@@ -151,12 +151,12 @@ var _ = Describe("Node Maintenance", func() {
 					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, node)).To(Succeed())
 					Expect(isTaintExist(node, medik8sDrainTaint.Key, medik8sDrainTaint.Effect)).To(BeFalse())
 					By("Adding drain taint")
-					Expect(AddOrRemoveTaint(r.drainer.Client, node, true)).To(Succeed())
+					Expect(AddOrRemoveTaint(r.drainer.Client, true, node, ctx)).To(Succeed())
 					taintedNode := &corev1.Node{}
 					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, taintedNode)).To(Succeed())
 					Expect(isTaintExist(taintedNode, medik8sDrainTaint.Key, medik8sDrainTaint.Effect)).To(BeTrue())
 					By("Removing drain taint")
-					Expect(AddOrRemoveTaint(r.drainer.Client, taintedNode, false)).To(Succeed())
+					Expect(AddOrRemoveTaint(r.drainer.Client, false, taintedNode, ctx)).To(Succeed())
 					unTaintedNode := &corev1.Node{}
 					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, unTaintedNode)).To(Succeed())
 					Expect(isTaintExist(unTaintedNode, medik8sDrainTaint.Key, medik8sDrainTaint.Effect)).To(BeFalse())

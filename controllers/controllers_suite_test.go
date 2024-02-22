@@ -91,16 +91,16 @@ var _ = BeforeSuite(func() {
 		LeaseManager: &mockLeaseManager{mockManager},
 		logger:       ctrl.Log.WithName("unit test"),
 	}
-	Expect(initDrainer(r, cfg)).To(Succeed())
+	// https://github.com/kubernetes-sigs/controller-runtime/issues/1571
+	ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
+	Expect(initDrainer(r, cfg, ctx)).To(Succeed())
 	// in test pods are not evicted, so don't wait forever for them
 	r.drainer.SkipWaitForDeleteTimeoutSeconds = 0
 
-	err = (r).SetupWithManager(k8sManager)
+	err = (r).SetupWithManager(ctx, k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
 	go func() {
-		// https://github.com/kubernetes-sigs/controller-runtime/issues/1571
-		ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
 		Expect(k8sManager.Start(ctx)).To(Succeed())
 	}()
 })
