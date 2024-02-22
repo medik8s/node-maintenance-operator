@@ -126,8 +126,9 @@ func main() {
 	if err = (&controllers.NodeMaintenanceReconciler{
 		Client:       cl,
 		Scheme:       mgr.GetScheme(),
+		MgrConfig:    mgr.GetConfig(),
 		LeaseManager: leaseManagerInitializer,
-	}).SetupWithManager(context.TODO(), mgr); err != nil {
+	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeMaintenance")
 		os.Exit(1)
 	}
