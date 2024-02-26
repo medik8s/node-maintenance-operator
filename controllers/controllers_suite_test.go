@@ -95,7 +95,7 @@ var _ = BeforeSuite(func() {
 		logger:       ctrl.Log.WithName("unit test"),
 	}
 	ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
-	drainer, err = createDrainer(cfg, ctx)
+	drainer, err = createDrainer(ctx, cfg)
 	Expect(err).NotTo(HaveOccurred())
 	// in test pods are not evicted, so don't wait forever for them
 	drainer.SkipWaitForDeleteTimeoutSeconds = 0
