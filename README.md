@@ -9,7 +9,7 @@ NMO was *previously* developed under [KubeVirt](https://github.com/kubevirt/node
 
 The purpose of this operator is to watch for new or deleted custom resources (CRs) called `NodeMaintenance` which indicate that a node in the cluster should either:
   - `NodeMaintenance` CR created: move node into maintenance, cordon the node - set it as unschedulable, and evict the pods (which can be evicted) from that node.
-  - `NodeMaintenance` CR deleted: remove pod from maintenance and uncordon the node - set it as schedulable.
+  - `NodeMaintenance` CR deleted: remove node from maintenance and uncordon the node - set it as schedulable.
 
 > *Note*:  The current behavior of the operator is to mimic `kubectl drain <node name>`.
 
