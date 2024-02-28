@@ -3,5 +3,6 @@ kind: NodeMaintenance
 metadata:
   name: nodemaintenance-sample
 spec:
+  evictionTimeout: "30s"
   nodeName: node02
   reason: "Test node maintenance"

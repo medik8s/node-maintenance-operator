@@ -46,6 +46,8 @@ Follow the instructions [here](https://sdk.operatorframework.io/docs/building-op
 
 To set maintenance on a node a `NodeMaintenance` custom resource should be created.
 The `NodeMaintenance` CR spec contains:
+
+- evictionTimeout: The timeout for pods eviction by drain/delete before giving up. Zero means infinite, and the default value is 30s.
 - nodeName: The name of the node which will be put into maintenance mode.
 - reason: The reason why the node will be under maintenance.
 
@@ -58,6 +60,7 @@ kind: NodeMaintenance
 metadata:
   name: nodemaintenance-sample
 spec:
+  evictionTimeout: "30s"
   nodeName: node02
   reason: "Test node maintenance"
 
