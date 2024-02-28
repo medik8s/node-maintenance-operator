@@ -20,6 +20,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/medik8s/common/pkg/lease"
 	. "github.com/onsi/ginkgo/v2"
@@ -95,7 +96,8 @@ var _ = BeforeSuite(func() {
 		logger:       ctrl.Log.WithName("unit test"),
 	}
 	ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
-	drainer, err = createDrainer(ctx, cfg)
+	evictionTimeout := time.Duration(30)
+	drainer, err = createDrainer(ctx, evictionTimeout, cfg)
 	Expect(err).NotTo(HaveOccurred())
 	// in test pods are not evicted, so don't wait forever for them
 	drainer.SkipWaitForDeleteTimeoutSeconds = 0

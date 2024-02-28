@@ -28,6 +28,11 @@ spec:
         name: nodemaintenances
         version: v1beta1
       specDescriptors:
+      - description: EvictionTimeout is the timeout for pods eviction by drain/delete
+          before giving up Zero means infinite Valid time units are "ms", "s", "m",
+          "h".
+        displayName: Eviction Timeout
+        path: evictionTimeout
       - description: Node name to apply maintanance on/off
         displayName: Node Name
         path: nodeName

@@ -41,6 +41,14 @@ spec:
           spec:
             description: NodeMaintenanceSpec defines the desired state of NodeMaintenance
             properties:
+              evictionTimeout:
+                default: 30s
+                description: |-
+                  EvictionTimeout is the timeout for pods eviction by drain/delete before giving up
+                  Zero means infinite
+                  Valid time units are "ms", "s", "m", "h".
+                pattern: ^(0|([0-9]+(\.[0-9]+)?(ms|s|m|h)))$
+                type: string
               nodeName:
                 description: Node name to apply maintanance on/off
                 type: string

@@ -118,7 +118,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Add finalizer when object is created
-	drainer, err := createDrainer(ctx, r.MgrConfig)
+	drainer, err := createDrainer(ctx, nm.Spec.EvictionTimeout.Duration, r.MgrConfig)
 	if err != nil {
 		return emptyResult, err
 	}
@@ -229,7 +229,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 // createDrainer creates a drain.Helper struct for external cordon and drain API
-func createDrainer(ctx context.Context, mgrConfig *rest.Config) (*drain.Helper, error) {
+func createDrainer(ctx context.Context, evicitonTimeout time.Duration, mgrConfig *rest.Config) (*drain.Helper, error) {
 	drainer := &drain.Helper{}
 
 	//Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.
@@ -254,9 +254,8 @@ func createDrainer(ctx context.Context, mgrConfig *rest.Config) (*drain.Helper, 
 	//Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.
 	drainer.GracePeriodSeconds = -1
 
-	// TODO - add logical value or attach from the maintenance CR
 	//The length of time to wait before giving up, zero means infinite
-	drainer.Timeout = DrainerTimeout
+	drainer.Timeout = evicitonTimeout
 
 	cs, err := kubernetes.NewForConfig(mgrConfig)
 	if err != nil {

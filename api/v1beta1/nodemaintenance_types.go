@@ -45,6 +45,14 @@ type NodeMaintenanceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// EvictionTimeout is the timeout for pods eviction by drain/delete before giving up
+	// Zero means infinite
+	// Valid time units are "ms", "s", "m", "h".
+	// +kubebuilder:default:="30s"
+	// +kubebuilder:validation:Pattern="^(0|([0-9]+(\\.[0-9]+)?(ms|s|m|h)))$"
+	// +kubebuilder:validation:Type:=string
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	EvictionTimeout metav1.Duration `json:"evictionTimeout,omitempty"`
 	// Node name to apply maintanance on/off
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	NodeName string `json:"nodeName"`
