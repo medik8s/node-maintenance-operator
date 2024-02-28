@@ -52,6 +52,7 @@ const (
 	WebhookCertDir  = "/apiserver.local.config/certificates"
 	WebhookCertName = "apiserver.crt"
 	WebhookKeyName  = "apiserver.key"
+	opreatorName = "NodeMaintenance"
 )
 
 var (
@@ -108,7 +109,7 @@ func main() {
 	cl := mgr.GetClient()
 	leaseManagerInitializer := &leaseManagerInitializer{cl: cl}
 	if err := mgr.Add(leaseManagerInitializer); err != nil {
-		setupLog.Error(err, "unable to set up lease Manager", "lease", "NodeMaintenance")
+		setupLog.Error(err, "unable to set up lease Manager", "lease", operatorName)
 		os.Exit(1)
 	}
 	
@@ -128,12 +129,13 @@ func main() {
 		Scheme:       mgr.GetScheme(),
 		MgrConfig:    mgr.GetConfig(),
 		LeaseManager: leaseManagerInitializer,
+		Recorder: mgr.GetEventRecorderFor(operatorName),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NodeMaintenance")
+		setupLog.Error(err, "unable to create controller", "controller", operatorName)
 		os.Exit(1)
 	}
 	if err = (&nodemaintenancev1beta1.NodeMaintenance{}).SetupWebhookWithManager(isOpenShift, mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "NodeMaintenance")
+		setupLog.Error(err, "unable to create webhook", "webhook", operatorName)
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
