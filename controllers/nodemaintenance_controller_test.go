@@ -240,7 +240,6 @@ var _ = Describe("Node Maintenance", func() {
 				maintenance := &v1beta1.NodeMaintenance{}
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
 
-				Expect(maintenance.Status.Phase).To(Equal(v1beta1.MaintenanceRunning))
 				Expect(len(maintenance.Status.PendingPods)).To(Equal(0))
 				Expect(maintenance.Status.EvictionPods).To(Equal(0))
 				Expect(maintenance.Status.TotalPods).To(Equal(0))
@@ -248,7 +247,9 @@ var _ = Describe("Node Maintenance", func() {
 				Expect(maintenance.Status.LastError).To(Equal(fmt.Sprintf("nodes \"%s\" not found", invalidNodeName)))
 				Expect(maintenance.Status.LastUpdate).NotTo(BeZero())
 				Expect(maintenance.Status.ErrorOnLeaseCount).To(Equal(0))
+				Expect(maintenance.Status.Phase).To(Equal(v1beta1.MaintenanceFailed))
 				verifyEvent(corev1.EventTypeNormal, utils.EventReasonBeginMaintenance, utils.EventMessageBeginMaintenance)
+				verifyEvent(corev1.EventTypeWarning, utils.EventReasonFailedMaintenance, utils.EventMessageFailedMaintenance)
 				verifyNoEvent(corev1.EventTypeNormal, utils.EventReasonEvictingPods, utils.EventMessageEvictingPods)
 			})
 		})

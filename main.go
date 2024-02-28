@@ -52,7 +52,7 @@ const (
 	WebhookCertDir  = "/apiserver.local.config/certificates"
 	WebhookCertName = "apiserver.crt"
 	WebhookKeyName  = "apiserver.key"
-	opreatorName = "NodeMaintenance"
+	operatorName = "NodeMaintenance"
 )
 
 var (
