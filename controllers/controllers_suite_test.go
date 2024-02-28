@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/kubectl/pkg/drain"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -47,6 +48,7 @@ var (
 	ctx       context.Context
 	cancel    context.CancelFunc
 	r         *NodeMaintenanceReconciler
+	drainer   *drain.Helper
 )
 
 func TestControllers(t *testing.T) {
@@ -88,19 +90,21 @@ var _ = BeforeSuite(func() {
 	r = &NodeMaintenanceReconciler{
 		Client:       k8sClient,
 		Scheme:       scheme.Scheme,
+		MgrConfig:    cfg,
 		LeaseManager: &mockLeaseManager{mockManager},
 		logger:       ctrl.Log.WithName("unit test"),
 	}
-	Expect(initDrainer(r, cfg)).To(Succeed())
+	ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
+	drainer, err = createDrainer(ctx, cfg)
+	Expect(err).NotTo(HaveOccurred())
 	// in test pods are not evicted, so don't wait forever for them
-	r.drainer.SkipWaitForDeleteTimeoutSeconds = 0
+	drainer.SkipWaitForDeleteTimeoutSeconds = 0
 
-	err = (r).SetupWithManager(k8sManager)
+	err = r.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
 	go func() {
 		// https://github.com/kubernetes-sigs/controller-runtime/issues/1571
-		ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
 		Expect(k8sManager.Start(ctx)).To(Succeed())
 	}()
 })

@@ -13,25 +13,29 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	medik8sDrainTaintKey      = "medik8s.io/drain"
+	nodeUnschedulableTaintKey = "node.kubernetes.io/unschedulable"
+)
+
 var medik8sDrainTaint = &corev1.Taint{
-	Key:    "medik8s.io/drain",
+	Key:    medik8sDrainTaintKey,
 	Effect: corev1.TaintEffectNoSchedule,
 }
 
-var NodeUnschedulableTaint = &corev1.Taint{
-	Key:    "node.kubernetes.io/unschedulable",
+var nodeUnschedulableTaint = &corev1.Taint{
+	Key:    nodeUnschedulableTaintKey,
 	Effect: corev1.TaintEffectNoSchedule,
 }
-var MaintenanceTaints = []corev1.Taint{*NodeUnschedulableTaint, *medik8sDrainTaint}
+var maintenanceTaints = []corev1.Taint{*nodeUnschedulableTaint, *medik8sDrainTaint}
 
-func AddOrRemoveTaint(clientset kubernetes.Interface, node *corev1.Node, add bool) error {
-
+func AddOrRemoveTaint(clientset kubernetes.Interface, add bool, node *corev1.Node, ctx context.Context) error {
 	taintStr := ""
 	patch := ""
 	client := clientset.CoreV1().Nodes()
 
 	if add {
-		newTaints := append([]corev1.Taint{}, MaintenanceTaints...)
+		newTaints := append([]corev1.Taint{}, maintenanceTaints...)
 		if !addTaints(node.Spec.Taints, &newTaints) {
 			return nil
 		}
@@ -44,7 +48,7 @@ func AddOrRemoveTaint(clientset kubernetes.Interface, node *corev1.Node, add boo
 		patch = fmt.Sprintf(`{ "op": "add", "path": "/spec/taints", "value": %s }`, string(addTaints))
 	} else {
 		newTaints := append([]corev1.Taint{}, node.Spec.Taints...)
-		if !deleteTaints(MaintenanceTaints, &newTaints) {
+		if !deleteTaints(maintenanceTaints, &newTaints) {
 			return nil
 		}
 		removeTaints, err := json.Marshal(newTaints)
@@ -65,7 +69,7 @@ func AddOrRemoveTaint(clientset kubernetes.Interface, node *corev1.Node, add boo
 
 	test := fmt.Sprintf(`{ "op": "test", "path": "/spec/taints", "value": %s }`, string(oldTaints))
 	log.Infof("Patching taints on Node: %s", node.Name)
-	_, err = client.Patch(context.Background(), node.Name, types.JSONPatchType, []byte(fmt.Sprintf("[ %s, %s ]", test, patch)), v1.PatchOptions{})
+	_, err = client.Patch(ctx, node.Name, types.JSONPatchType, []byte(fmt.Sprintf("[ %s, %s ]", test, patch)), v1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("patching node taints failed: %v", err)
 	}

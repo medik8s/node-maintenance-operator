@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/medik8s/common/pkg/labels"
+	commonLabels "github.com/medik8s/common/pkg/labels"
 	"github.com/medik8s/common/pkg/lease"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,13 +35,13 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/drain"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/api/v1beta1"
+	"github.com/medik8s/node-maintenance-operator/api/v1beta1"
 )
 
 const (
@@ -59,9 +59,16 @@ const (
 type NodeMaintenanceReconciler struct {
 	client.Client
 	Scheme       *runtime.Scheme
+	MgrConfig    *rest.Config
 	LeaseManager lease.Manager
-	drainer      *drain.Helper
 	logger       logr.Logger
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *NodeMaintenanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&v1beta1.NodeMaintenance{}).
+		Complete(r)
 }
 
 //+kubebuilder:rbac:groups=nodemaintenance.medik8s.io,resources=nodemaintenances,verbs=get;list;watch;create;update;patch;delete
@@ -91,159 +98,139 @@ type NodeMaintenanceReconciler struct {
 func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.logger = log.FromContext(ctx)
 	r.logger.Info("Reconciling NodeMaintenance")
+	defer r.logger.Info("Reconcile completed")
+	emptyResult := ctrl.Result{}
 
-	// Fetch the NodeMaintenance instance
-	instance := &nodemaintenancev1beta1.NodeMaintenance{}
-	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
+	// Fetch the NodeMaintenance instance (nm)
+	nm := &v1beta1.NodeMaintenance{}
+	err := r.Client.Get(ctx, req.NamespacedName, nm)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
 			r.logger.Info("NodeMaintenance not found", "name", req.NamespacedName)
-			return reconcile.Result{}, nil
+			return emptyResult, nil
 		}
 		// Error reading the object - requeue the request.
 		r.logger.Info("Error reading the request object, requeuing.")
-		return reconcile.Result{}, err
+		return emptyResult, err
 	}
 
 	// Add finalizer when object is created
-	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !ContainsString(instance.ObjectMeta.Finalizers, nodemaintenancev1beta1.NodeMaintenanceFinalizer) {
-			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, nodemaintenancev1beta1.NodeMaintenanceFinalizer)
-			if err := r.Client.Update(context.TODO(), instance); err != nil {
-				return r.onReconcileError(instance, err)
-			}
+	drainer, err := createDrainer(ctx, r.MgrConfig)
+	if err != nil {
+		return emptyResult, err
+	}
+
+	if !controllerutil.ContainsFinalizer(nm, v1beta1.NodeMaintenanceFinalizer) && nm.ObjectMeta.DeletionTimestamp.IsZero() {
+		controllerutil.AddFinalizer(nm, v1beta1.NodeMaintenanceFinalizer)
+		if err := r.Client.Update(ctx, nm); err != nil {
+			return r.onReconcileError(ctx, nm, drainer, err)
 		}
-	} else {
+	} else if controllerutil.ContainsFinalizer(nm, v1beta1.NodeMaintenanceFinalizer) && !nm.ObjectMeta.DeletionTimestamp.IsZero() {
+		// The object is being deleted
 		r.logger.Info("Deletion timestamp not zero")
 
-		// The object is being deleted
-		if ContainsString(instance.ObjectMeta.Finalizers, nodemaintenancev1beta1.NodeMaintenanceFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
-			// Stop node maintenance - uncordon and remove live migration taint from the node.
-			if err := r.stopNodeMaintenanceOnDeletion(ctx, instance.Spec.NodeName); err != nil {
-				r.logger.Error(err, "error stopping node maintenance")
-				if errors.IsNotFound(err) == false {
-					return r.onReconcileError(instance, err)
-				}
-			}
-
-			// Remove our finalizer from the list and update it.
-			instance.ObjectMeta.Finalizers = RemoveString(instance.ObjectMeta.Finalizers, nodemaintenancev1beta1.NodeMaintenanceFinalizer)
-			if err := r.Client.Update(context.Background(), instance); err != nil {
-				return r.onReconcileError(instance, err)
+		// Stop node maintenance - uncordon and remove live migration taint from the node.
+		if err := r.stopNodeMaintenanceOnDeletion(ctx, drainer, nm.Spec.NodeName); err != nil {
+			r.logger.Error(err, "error stopping node maintenance")
+			if !errors.IsNotFound(err) {
+				return r.onReconcileError(ctx, nm, drainer, err)
 			}
 		}
-		return reconcile.Result{}, nil
+
+		// Remove finalizer
+		controllerutil.RemoveFinalizer(nm, v1beta1.NodeMaintenanceFinalizer)
+		if err := r.Client.Update(ctx, nm); err != nil {
+			return r.onReconcileError(ctx, nm, drainer, err)
+		}
+		return emptyResult, nil
 	}
 
-	err = initMaintenanceStatus(instance, r.drainer, r.Client)
+	err = initMaintenanceStatus(ctx, nm, drainer, r.Client)
 	if err != nil {
 		r.logger.Error(err, "Failed to update NodeMaintenance with \"Running\" status")
-		return r.onReconcileError(instance, err)
+		return r.onReconcileError(ctx, nm, drainer, err)
 	}
 
-	nodeName := instance.Spec.NodeName
+	nodeName := nm.Spec.NodeName
 
-	r.logger.Info("Applying maintenance mode", "node", nodeName, "reason", instance.Spec.Reason)
-	node, err := r.fetchNode(nodeName)
+	r.logger.Info("Applying maintenance mode", "node", nodeName, "reason", nm.Spec.Reason)
+	node, err := r.fetchNode(ctx, drainer, nodeName)
 	if err != nil {
-		return r.onReconcileError(instance, err)
+		return r.onReconcileError(ctx, nm, drainer, err)
 	}
 
-	setOwnerRefToNode(instance, node, r.logger)
+	setOwnerRefToNode(nm, node, r.logger)
 
-	updateOwnedLeaseFailed, err := r.obtainLease(node)
+	updateOwnedLeaseFailed, err := r.obtainLease(ctx, node)
 	if err != nil && updateOwnedLeaseFailed {
-		instance.Status.ErrorOnLeaseCount += 1
-		if instance.Status.ErrorOnLeaseCount > maxAllowedErrorToUpdateOwnedLease {
+		nm.Status.ErrorOnLeaseCount += 1
+		if nm.Status.ErrorOnLeaseCount > maxAllowedErrorToUpdateOwnedLease {
 			r.logger.Info("can't extend owned lease. uncordon for now")
 
 			// Uncordon the node
-			err = r.stopNodeMaintenanceImp(ctx, node)
+			err = r.stopNodeMaintenanceImp(ctx, drainer, node)
 			if err != nil {
-				return r.onReconcileError(instance, fmt.Errorf("Failed to uncordon upon failure to obtain owned lease : %v ", err))
+				return r.onReconcileError(ctx, nm, drainer, fmt.Errorf("failed to uncordon upon failure to obtain owned lease : %v ", err))
 			}
-			instance.Status.Phase = nodemaintenancev1beta1.MaintenanceFailed
+			nm.Status.Phase = v1beta1.MaintenanceFailed
 		}
-		return r.onReconcileError(instance, fmt.Errorf("failed to extend lease owned by us : %v errorOnLeaseCount %d", err, instance.Status.ErrorOnLeaseCount))
+		return r.onReconcileError(ctx, nm, drainer, fmt.Errorf("failed to extend lease owned by us : %v errorOnLeaseCount %d", err, nm.Status.ErrorOnLeaseCount))
 	}
 	if err != nil {
-		instance.Status.ErrorOnLeaseCount = 0
-		return r.onReconcileError(instance, err)
+		nm.Status.ErrorOnLeaseCount = 0
+		return r.onReconcileError(ctx, nm, drainer, err)
 	} else {
-		if instance.Status.Phase != nodemaintenancev1beta1.MaintenanceRunning || instance.Status.ErrorOnLeaseCount != 0 {
-			instance.Status.Phase = nodemaintenancev1beta1.MaintenanceRunning
-			instance.Status.ErrorOnLeaseCount = 0
+		if nm.Status.Phase != v1beta1.MaintenanceRunning || nm.Status.ErrorOnLeaseCount != 0 {
+			nm.Status.Phase = v1beta1.MaintenanceRunning
+			nm.Status.ErrorOnLeaseCount = 0
 
 		}
 	}
-	//Add exclude from remediation label
+
 	if err := addExcludeRemediationLabel(ctx, node, r.Client, r.logger); err != nil {
-		return r.onReconcileError(instance, err)
+		return r.onReconcileError(ctx, nm, drainer, err)
 	}
 
 	// Cordon node
-	err = AddOrRemoveTaint(r.drainer.Client, node, true)
+	err = AddOrRemoveTaint(drainer.Client, true, node, ctx)
 	if err != nil {
-		return r.onReconcileError(instance, err)
+		return r.onReconcileError(ctx, nm, drainer, err)
 	}
 
-	if err = drain.RunCordonOrUncordon(r.drainer, node, true); err != nil {
-		return r.onReconcileError(instance, err)
+	if err = drain.RunCordonOrUncordon(drainer, node, true); err != nil {
+		return r.onReconcileError(ctx, nm, drainer, err)
 	}
 
 	r.logger.Info("Evict all Pods from Node", "nodeName", nodeName)
 
-	if err = drain.RunNodeDrain(r.drainer, nodeName); err != nil {
+	if err = drain.RunNodeDrain(drainer, nodeName); err != nil {
 		r.logger.Info("Not all pods evicted", "nodeName", nodeName, "error", err)
 		waitOnReconcile := waitDurationOnDrainError
-		return r.onReconcileErrorWithRequeue(instance, err, &waitOnReconcile)
-	} else if instance.Status.Phase != nodemaintenancev1beta1.MaintenanceSucceeded {
-		setLastUpdate(instance)
+		return r.onReconcileErrorWithRequeue(ctx, nm, drainer, err, &waitOnReconcile)
+	} else if nm.Status.Phase != v1beta1.MaintenanceSucceeded {
+		setLastUpdate(nm)
 	}
-	r.logger.Info("All pods evicted", "nodeName", nodeName)
 
-	instance.Status.Phase = nodemaintenancev1beta1.MaintenanceSucceeded
-	instance.Status.DrainProgress = 100
-	instance.Status.PendingPods = nil
-	err = r.Client.Status().Update(context.TODO(), instance)
+	nm.Status.Phase = v1beta1.MaintenanceSucceeded
+	nm.Status.DrainProgress = 100
+	nm.Status.PendingPods = nil
+	err = r.Client.Status().Update(ctx, nm)
 	if err != nil {
 		r.logger.Error(err, "Failed to update NodeMaintenance with \"Succeeded\" status")
-		return r.onReconcileError(instance, err)
+		return r.onReconcileError(ctx, nm, drainer, err)
 	}
-	r.logger.Info("Reconcile completed", "nodeName", nodeName)
 
-	return reconcile.Result{}, nil
+	r.logger.Info("Maintenance was completed - all pods were evicted", "nodeName", nodeName)
+	return emptyResult, nil
 
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *NodeMaintenanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := initDrainer(r, mgr.GetConfig()); err != nil {
-		return err
-	}
-
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&nodemaintenancev1beta1.NodeMaintenance{}).
-		Complete(r)
-}
-
-func onPodDeletedOrEvicted(pod *corev1.Pod, usingEviction bool) {
-	var verbString string
-	if usingEviction {
-		verbString = "Evicted"
-	} else {
-		verbString = "Deleted"
-	}
-	msg := fmt.Sprintf("pod: %s:%s %s from node: %s", pod.ObjectMeta.Namespace, pod.ObjectMeta.Name, verbString, pod.Spec.NodeName)
-	klog.Info(msg)
-}
-
-func initDrainer(r *NodeMaintenanceReconciler, config *rest.Config) error {
-
-	r.drainer = &drain.Helper{}
+// createDrainer creates a drain.Helper struct for external cordon and drain API
+func createDrainer(ctx context.Context, mgrConfig *rest.Config) (*drain.Helper, error) {
+	drainer := &drain.Helper{}
 
 	//Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.
 	//This is required because VirtualMachineInstance pods are not owned by a ReplicaSet or DaemonSet controller.
@@ -251,41 +238,52 @@ func initDrainer(r *NodeMaintenanceReconciler, config *rest.Config) error {
 	//re-scheduled replacements placed else where in the cluster after the pods are evicted.
 	//medik8s has its own controllers which manage the underlying VirtualMachineInstance pods.
 	//Each controller behaves differently to a VirtualMachineInstance being evicted.
-	r.drainer.Force = true
+	drainer.Force = true
 
 	//Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).
 	//This is necessary for removing any pod that utilizes an emptyDir volume.
 	//The VirtualMachineInstance Pod does use emptryDir volumes,
 	//however the data in those volumes are ephemeral which means it is safe to delete after termination.
-	r.drainer.DeleteEmptyDirData = true
+	drainer.DeleteEmptyDirData = true
 
 	//Ignore DaemonSet-managed pods.
 	//This is required because every node running a VirtualMachineInstance will also be running our helper DaemonSet called virt-handler.
 	//This flag indicates that it is safe to proceed with the eviction and to just ignore DaemonSets.
-	r.drainer.IgnoreAllDaemonSets = true
+	drainer.IgnoreAllDaemonSets = true
 
 	//Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.
-	r.drainer.GracePeriodSeconds = -1
+	drainer.GracePeriodSeconds = -1
 
 	// TODO - add logical value or attach from the maintenance CR
 	//The length of time to wait before giving up, zero means infinite
-	r.drainer.Timeout = DrainerTimeout
+	drainer.Timeout = DrainerTimeout
 
-	cs, err := kubernetes.NewForConfig(config)
+	cs, err := kubernetes.NewForConfig(mgrConfig)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	r.drainer.Client = cs
-	r.drainer.DryRunStrategy = util.DryRunNone
-	r.drainer.Ctx = context.Background()
+	drainer.Client = cs
+	drainer.DryRunStrategy = util.DryRunNone
+	drainer.Ctx = ctx
 
-	r.drainer.Out = writer{klog.Info}
-	r.drainer.ErrOut = writer{klog.Error}
-	r.drainer.OnPodDeletedOrEvicted = onPodDeletedOrEvicted
-	return nil
+	drainer.Out = writer{klog.Info}
+	drainer.ErrOut = writer{klog.Error}
+
+	// OnPodDeletedOrEvicted function is called when a pod is evicted/deleted; for printing progress output
+	drainer.OnPodDeletedOrEvicted = func(pod *corev1.Pod, usingEviction bool) {
+		var verbString string
+		if usingEviction {
+			verbString = "Evicted"
+		} else {
+			verbString = "Deleted"
+		}
+		msg := fmt.Sprintf("pod: %s:%s %s from node: %s", pod.ObjectMeta.Namespace, pod.ObjectMeta.Name, verbString, pod.Spec.NodeName)
+		klog.Info(msg)
+	}
+	return drainer, nil
 }
 
-func setOwnerRefToNode(nm *nodemaintenancev1beta1.NodeMaintenance, node *corev1.Node, log logr.Logger) {
+func setOwnerRefToNode(nm *v1beta1.NodeMaintenance, node *corev1.Node, log logr.Logger) {
 
 	for _, ref := range nm.ObjectMeta.GetOwnerReferences() {
 		if ref.APIVersion == node.TypeMeta.APIVersion && ref.Kind == node.TypeMeta.Kind && ref.Name == node.ObjectMeta.GetName() && ref.UID == node.ObjectMeta.GetUID() {
@@ -301,16 +299,16 @@ func setOwnerRefToNode(nm *nodemaintenancev1beta1.NodeMaintenance, node *corev1.
 		Kind:               nodeMeta.Kind,
 		Name:               node.ObjectMeta.GetName(),
 		UID:                node.ObjectMeta.GetUID(),
-		BlockOwnerDeletion: pointer.Bool(false),
-		Controller:         pointer.Bool(false),
+		BlockOwnerDeletion: ptr.To[bool](false),
+		Controller:         ptr.To[bool](false),
 	}
 
 	nm.ObjectMeta.SetOwnerReferences(append(nm.ObjectMeta.GetOwnerReferences(), ref))
 }
 
-func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error) {
+func (r *NodeMaintenanceReconciler) obtainLease(ctx context.Context, node *corev1.Node) (bool, error) {
 	r.logger.Info("Lease object supported, obtaining lease")
-	err := r.LeaseManager.RequestLease(context.Background(), node, LeaseDuration)
+	err := r.LeaseManager.RequestLease(ctx, node, LeaseDuration)
 
 	if err != nil {
 		r.logger.Error(err, "failed to create or get existing lease")
@@ -321,12 +319,12 @@ func (r *NodeMaintenanceReconciler) obtainLease(node *corev1.Node) (bool, error)
 }
 
 func addExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client.Client, log logr.Logger) error {
-	if node.Labels[labels.ExcludeFromRemediation] != "true" {
+	if node.Labels[commonLabels.ExcludeFromRemediation] != "true" {
 		patch := client.MergeFrom(node.DeepCopy())
 		if node.Labels == nil {
-			node.Labels = map[string]string{labels.ExcludeFromRemediation: "true"}
-		} else if node.Labels[labels.ExcludeFromRemediation] != "true" {
-			node.Labels[labels.ExcludeFromRemediation] = "true"
+			node.Labels = map[string]string{commonLabels.ExcludeFromRemediation: "true"}
+		} else if node.Labels[commonLabels.ExcludeFromRemediation] != "true" {
+			node.Labels[commonLabels.ExcludeFromRemediation] = "true"
 		}
 		if err := r.Patch(ctx, node, patch); err != nil {
 			log.Error(err, "Failed to add exclude from remediation label from the node", "node name", node.Name)
@@ -337,9 +335,9 @@ func addExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client
 }
 
 func removeExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client.Client, log logr.Logger) error {
-	if node.Labels[labels.ExcludeFromRemediation] == "true" {
+	if node.Labels[commonLabels.ExcludeFromRemediation] == "true" {
 		patch := client.MergeFrom(node.DeepCopy())
-		delete(node.Labels, labels.ExcludeFromRemediation)
+		delete(node.Labels, commonLabels.ExcludeFromRemediation)
 		if err := r.Patch(ctx, node, patch); err != nil {
 			log.Error(err, "Failed to remove exclude from remediation label from the node", "node name", node.Name)
 			return err
@@ -348,14 +346,14 @@ func removeExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r cli
 	return nil
 }
 
-func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, node *corev1.Node) error {
+func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, drainer *drain.Helper, node *corev1.Node) error {
 	// Uncordon the node
-	err := AddOrRemoveTaint(r.drainer.Client, node, false)
+	err := AddOrRemoveTaint(drainer.Client, false, node, ctx)
 	if err != nil {
 		return err
 	}
 
-	if err = drain.RunCordonOrUncordon(r.drainer, node, false); err != nil {
+	if err = drain.RunCordonOrUncordon(drainer, node, false); err != nil {
 		return err
 	}
 
@@ -365,8 +363,8 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, 
 	return removeExcludeRemediationLabel(ctx, node, r.Client, r.logger)
 }
 
-func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Context, nodeName string) error {
-	node, err := r.fetchNode(nodeName)
+func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Context, drainer *drain.Helper, nodeName string) error {
+	node, err := r.fetchNode(ctx, drainer, nodeName)
 	if err != nil {
 		// if CR is gathered as result of garbage collection: the node may have been deleted, but the CR has not yet been deleted, still we must clean up the lease!
 		if errors.IsNotFound(err) {
@@ -377,11 +375,11 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Co
 		}
 		return err
 	}
-	return r.stopNodeMaintenanceImp(ctx, node)
+	return r.stopNodeMaintenanceImp(ctx, drainer, node)
 }
 
-func (r *NodeMaintenanceReconciler) fetchNode(nodeName string) (*corev1.Node, error) {
-	node, err := r.drainer.Client.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+func (r *NodeMaintenanceReconciler) fetchNode(ctx context.Context, drainer *drain.Helper, nodeName string) (*corev1.Node, error) {
+	node, err := drainer.Client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	if err != nil && errors.IsNotFound(err) {
 		r.logger.Error(err, "Node cannot be found", "nodeName", nodeName)
 		return nil, err
@@ -392,9 +390,9 @@ func (r *NodeMaintenanceReconciler) fetchNode(nodeName string) (*corev1.Node, er
 	return node, nil
 }
 
-func initMaintenanceStatus(nm *nodemaintenancev1beta1.NodeMaintenance, drainer *drain.Helper, r client.Client) error {
+func initMaintenanceStatus(ctx context.Context, nm *v1beta1.NodeMaintenance, drainer *drain.Helper, r client.Client) error {
 	if nm.Status.Phase == "" {
-		nm.Status.Phase = nodemaintenancev1beta1.MaintenanceRunning
+		nm.Status.Phase = v1beta1.MaintenanceRunning
 		setLastUpdate(nm)
 		pendingList, errlist := drainer.GetPodsForDeletion(nm.Spec.NodeName)
 		if errlist != nil {
@@ -406,7 +404,7 @@ func initMaintenanceStatus(nm *nodemaintenancev1beta1.NodeMaintenance, drainer *
 		nm.Status.EvictionPods = len(nm.Status.PendingPods)
 
 		podlist, err := drainer.Client.CoreV1().Pods(metav1.NamespaceAll).List(
-			context.Background(),
+			ctx,
 			metav1.ListOptions{
 				FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nm.Spec.NodeName}).String(),
 			})
@@ -414,18 +412,18 @@ func initMaintenanceStatus(nm *nodemaintenancev1beta1.NodeMaintenance, drainer *
 			return err
 		}
 		nm.Status.TotalPods = len(podlist.Items)
-		err = r.Status().Update(context.TODO(), nm)
+		err = r.Status().Update(ctx, nm)
 		return err
 	}
 	return nil
 }
 
-func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(nm *nodemaintenancev1beta1.NodeMaintenance, err error, duration *time.Duration) (reconcile.Result, error) {
+func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(ctx context.Context, nm *v1beta1.NodeMaintenance, drainer *drain.Helper, err error, duration *time.Duration) (ctrl.Result, error) {
 	nm.Status.LastError = err.Error()
 	setLastUpdate(nm)
 
 	if nm.Spec.NodeName != "" {
-		pendingList, _ := r.drainer.GetPodsForDeletion(nm.Spec.NodeName)
+		pendingList, _ := drainer.GetPodsForDeletion(nm.Spec.NodeName)
 		if pendingList != nil {
 			nm.Status.PendingPods = GetPodNameList(pendingList.Pods())
 			if nm.Status.EvictionPods != 0 {
@@ -434,24 +432,23 @@ func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(nm *nodemaintena
 		}
 	}
 
-	updateErr := r.Client.Status().Update(context.TODO(), nm)
+	updateErr := r.Client.Status().Update(ctx, nm)
 	if updateErr != nil {
 		r.logger.Error(updateErr, "Failed to update NodeMaintenance with \"Failed\" status")
 	}
 	if duration != nil {
 		r.logger.Info(FixedDurationReconcileLog)
-		return reconcile.Result{RequeueAfter: *duration}, nil
+		return ctrl.Result{RequeueAfter: *duration}, nil
 	}
 	r.logger.Info("Reconciling with exponential duration")
-	return reconcile.Result{}, err
+	return ctrl.Result{}, err
 }
 
-func (r *NodeMaintenanceReconciler) onReconcileError(nm *nodemaintenancev1beta1.NodeMaintenance, err error) (reconcile.Result, error) {
-	return r.onReconcileErrorWithRequeue(nm, err, nil)
-
+func (r *NodeMaintenanceReconciler) onReconcileError(ctx context.Context, nm *v1beta1.NodeMaintenance, drainer *drain.Helper, err error) (ctrl.Result, error) {
+	return r.onReconcileErrorWithRequeue(ctx, nm, drainer, err, nil)
 }
 
-func setLastUpdate(nm *nodemaintenancev1beta1.NodeMaintenance) {
+func setLastUpdate(nm *v1beta1.NodeMaintenance) {
 	nm.Status.LastUpdate.Time = time.Now()
 }
 
