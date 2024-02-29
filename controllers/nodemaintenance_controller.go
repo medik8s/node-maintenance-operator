@@ -148,8 +148,11 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return emptyResult, nil
 	}
 
-	err = initMaintenanceStatus(ctx, nm, drainer, r.Client)
-	if err != nil {
+	if err = initMaintenanceStatus(ctx, nm, drainer); err != nil {
+		r.logger.Error(err, "Failed to initalize NodeMaintenance status")
+		return r.onReconcileError(ctx, nm, drainer, err)
+	}
+	if err = r.Client.Status().Update(ctx, nm); err != nil {
 		r.logger.Error(err, "Failed to update NodeMaintenance with \"Running\" status")
 		return r.onReconcileError(ctx, nm, drainer, err)
 	}
@@ -390,7 +393,7 @@ func (r *NodeMaintenanceReconciler) fetchNode(ctx context.Context, drainer *drai
 	return node, nil
 }
 
-func initMaintenanceStatus(ctx context.Context, nm *v1beta1.NodeMaintenance, drainer *drain.Helper, r client.Client) error {
+func initMaintenanceStatus(ctx context.Context, nm *v1beta1.NodeMaintenance, drainer *drain.Helper) error {
 	if nm.Status.Phase == "" {
 		nm.Status.Phase = v1beta1.MaintenanceRunning
 		setLastUpdate(nm)
@@ -412,7 +415,6 @@ func initMaintenanceStatus(ctx context.Context, nm *v1beta1.NodeMaintenance, dra
 			return err
 		}
 		nm.Status.TotalPods = len(podlist.Items)
-		err = r.Status().Update(ctx, nm)
 		return err
 	}
 	return nil
