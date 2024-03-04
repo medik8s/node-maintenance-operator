@@ -18,7 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nmo "github.com/medik8s/node-maintenance-operator/api/v1beta1"
@@ -58,7 +58,7 @@ var _ = Describe("Starting Maintenance", func() {
 			if controPlaneMaintenance == nil {
 				// do this once only
 				controlPlaneNode = controlPlaneNodes[0]
-				controPlaneMaintenance = getNodeMaintenance(fmt.Sprintf("test-1st-control-plane-%s", controlPlaneNode), controlPlaneNode)
+				controPlaneMaintenance = getNodeMaintenance(fmt.Sprintf("test-1st-control-plane-%s", controlPlaneNode), controlPlaneNode, evicitonTimeout)
 				err = createCRIgnoreUnrelatedErrors(controPlaneMaintenance)
 			}
 		})
@@ -107,7 +107,7 @@ var _ = Describe("Starting Maintenance", func() {
 			time.Sleep(10 * time.Second)
 
 			controlPlaneNode := controlPlaneNodes[1]
-			nodeMaintenance := getNodeMaintenance(fmt.Sprintf("test-2nd-control-plane-%s", controlPlaneNode), controlPlaneNode)
+			nodeMaintenance := getNodeMaintenance(fmt.Sprintf("test-2nd-control-plane-%s", controlPlaneNode), controlPlaneNode, evicitonTimeout)
 
 			err := createCRIgnoreUnrelatedErrors(nodeMaintenance)
 			Expect(err).To(HaveOccurred())
@@ -118,14 +118,14 @@ var _ = Describe("Starting Maintenance", func() {
 	Context("for a not existing node", func() {
 		It("should fail", func() {
 			nodeName := "doesNotExist"
-			nodeMaintenance := getNodeMaintenance("test-unexisting", nodeName)
+			nodeMaintenance := getNodeMaintenance("test-unexisting", nodeName, evicitonTimeout)
 			err := createCRIgnoreUnrelatedErrors(nodeMaintenance)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf(nmo.ErrorNodeNotExists, nodeName)), "Unexpected error message")
 		})
 	})
 
-	Context("for a worker node", func() {
+	Context("for a worker node with a high eviction timeout", func() {
 
 		var maintenanceNodeName string
 		var nodeMaintenance *nmo.NodeMaintenance
@@ -135,9 +135,9 @@ var _ = Describe("Starting Maintenance", func() {
 			// do this once only
 			if nodeMaintenance == nil {
 				startTime = time.Now()
-				createTestDeployment()
+				createTestDeployment(testDeployment)
 				maintenanceNodeName = getTestDeploymentNodeName()
-				nodeMaintenance = getNodeMaintenance(testMaintenance, maintenanceNodeName)
+				nodeMaintenance = getNodeMaintenance(testMaintenance, maintenanceNodeName, evicitonTimeout)
 			}
 		})
 
@@ -147,7 +147,7 @@ var _ = Describe("Starting Maintenance", func() {
 		})
 
 		It("should prevent creating another maintenance for the same node", func() {
-			nmDuplicate := getNodeMaintenance("test-duplicate", maintenanceNodeName)
+			nmDuplicate := getNodeMaintenance("test-duplicate", maintenanceNodeName, evicitonTimeout)
 			err := createCRIgnoreUnrelatedErrors(nmDuplicate)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf(nmo.ErrorNodeMaintenanceExists, maintenanceNodeName)), "Unexpected error message")
@@ -193,10 +193,10 @@ var _ = Describe("Starting Maintenance", func() {
 			}, 300*time.Second, 10*time.Second).Should(BeTrue(), "maintenance did not succeed in time")
 		})
 
-		It("should have been reconciled with fixed duration at least once", func() {
+		It("shouldn't been reconciled with fixed duration", func() {
 			// check operator log showing it reconciled with fixed duration because of drain timeout
 			// it should be caused by the test deployment's termination graceperiod > drain timeout
-			Expect(getOperatorLogs()).To(ContainSubstring(nodemaintenance.FixedDurationReconcileLog))
+			Expect(getOperatorLogs()).NotTo(ContainSubstring(nodemaintenance.FixedDurationReconcileLog))
 		})
 
 		It("should result in unschedulable and tainted node", func() {
@@ -256,6 +256,42 @@ var _ = Describe("Starting Maintenance", func() {
 		})
 
 	})
+	Context("for a worker node with a low eviction timeout", func() {
+
+		var maintenanceNodeName string
+		var nodeMaintenance *nmo.NodeMaintenance
+
+		BeforeEach(func() {
+			createTestDeployment("test-deployment-2")
+			maintenanceNodeName = getTestDeploymentNodeName()
+			nodeMaintenance = getNodeMaintenance(testMaintenance, maintenanceNodeName, time.Second*10)
+			Expect(createCRIgnoreUnrelatedErrors(nodeMaintenance)).To(Succeed())
+			DeferCleanup(Client.Delete, context.TODO(), nodeMaintenance)
+		})
+
+		When("evction timeout is low", func() {
+			It("should succeed and be reconciled with fixed duration at least once", func() {
+				By("verify CR has phase is succeeded")
+				Eventually(func() (bool, error) {
+					nm := &nmo.NodeMaintenance{}
+					if err := Client.Get(context.TODO(), types.NamespacedName{Name: nodeMaintenance.Name}, nm); err != nil {
+						return false, err
+					}
+
+					if nm.Status.Phase != nmo.MaintenanceSucceeded {
+						logInfof("phase: %s\n", nm.Status.Phase)
+						return false, nil
+					}
+
+					return true, nil
+				}, 300*time.Second, 10*time.Second).Should(BeTrue(), "maintenance did not succeed in time")
+				By("verify printed log")
+				// check operator log showing it reconciled with fixed duration because of drain timeout
+				// it should be caused by the test deployment's termination graceperiod > drain timeout
+				Expect(getOperatorLogs()).To(ContainSubstring(nodemaintenance.FixedDurationReconcileLog))
+			})
+		})
+	})
 })
 
 func getNodes() ([]string, []string) {
@@ -284,7 +320,7 @@ func getNodes() ([]string, []string) {
 	return controlPlaneNodes, workers
 }
 
-func getNodeMaintenance(name, nodeName string) *nmo.NodeMaintenance {
+func getNodeMaintenance(name, nodeName string, evicitonTimeout time.Duration) *nmo.NodeMaintenance {
 	return &nmo.NodeMaintenance{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NodeMaintenance",
@@ -294,8 +330,9 @@ func getNodeMaintenance(name, nodeName string) *nmo.NodeMaintenance {
 			Name: "nodemaintenance-" + name,
 		},
 		Spec: nmo.NodeMaintenanceSpec{
-			NodeName: nodeName,
-			Reason:   "Set maintenance on node for e2e testing",
+			EvictionTimeout: metav1.Duration{Duration: evicitonTimeout},
+			NodeName:        nodeName,
+			Reason:          "Set maintenance on node for e2e testing",
 		},
 	}
 }
@@ -321,7 +358,7 @@ func createCRIgnoreUnrelatedErrors(nm *nmo.NodeMaintenance) error {
 	return err
 }
 
-func createTestDeployment() {
+func createTestDeployment(testDeployment string) {
 	dep := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
@@ -332,7 +369,7 @@ func createTestDeployment() {
 			Namespace: testNsName,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: pointer.Int32Ptr(1),
+			Replicas: ptr.To[int32](1),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: podLabel,
 			},
@@ -372,8 +409,6 @@ func createTestDeployment() {
 						Command: []string{"/bin/sh"},
 						Args:    []string{"-c", "while true; do echo hello; sleep 10;done"},
 					}},
-					// make sure we run into the drain timeout at least once
-					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(nodemaintenance.DrainerTimeout.Seconds()) + 50),
 				},
 			},
 		},

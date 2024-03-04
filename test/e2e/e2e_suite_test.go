@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/reporters"
@@ -26,7 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/medik8s/node-maintenance-operator/api/v1beta1"
 )
@@ -41,8 +42,10 @@ var (
 	// The ns for test deployments
 	testNsName    string
 	testNamespace *corev1.Namespace
-	//namespace leases are created in
+	// namespace leases are created in
 	leaseNs = "medik8s-leases"
+	// default eviction timeout (30s)
+	evicitonTimeout = time.Second * 50
 )
 
 var _ = BeforeSuite(func() {
@@ -52,7 +55,7 @@ var _ = BeforeSuite(func() {
 	testNsName = os.Getenv("TEST_NAMESPACE")
 	Expect(testNsName).ToNot(BeEmpty(), "TEST_NAMESPACE env var not set, can't start e2e test")
 	testNamespace = &corev1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: testNsName,
 		},
 	}
@@ -66,7 +69,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	// wait until webhooks are up and running by trying to create a CR and ignoring unexpected errors
-	testCR := getNodeMaintenance("webhook-test", "some-not-existing-node-name")
+	testCR := getNodeMaintenance("webhook-test", "some-not-existing-node-name", evicitonTimeout)
 	_ = createCRIgnoreUnrelatedErrors(testCR)
 })
 
