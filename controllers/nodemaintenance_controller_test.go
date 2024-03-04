@@ -66,8 +66,9 @@ var _ = Describe("Node Maintenance", func() {
 			})
 			When("Status was initalized", func() {
 				It("should be set for running with 2 pods to drain", func() {
-					Expect(initMaintenanceStatus(ctx, nm, drainer)).Error().NotTo(HaveOccurred())
-					// status was initialized but the function will fail on updating the CR status, since we don't create a nm CR here
+					toUpdate, err := initMaintenanceStatus(ctx, nm, drainer)
+					Expect(toUpdate).To(BeTrue())
+					Expect(err).NotTo(HaveOccurred())
 					Expect(nm.Status.Phase).To(Equal(v1beta1.MaintenanceRunning))
 					Expect(len(nm.Status.PendingPods)).To(Equal(2))
 					Expect(nm.Status.EvictionPods).To(Equal(2))
@@ -78,8 +79,9 @@ var _ = Describe("Node Maintenance", func() {
 			})
 			When("Owner ref was set", func() {
 				It("should be set properly", func() {
-					Expect(initMaintenanceStatus(ctx, nm, drainer)).Error().NotTo(HaveOccurred())
-					// status was initialized but the function will fail on updating the CR status, since we don't create a nm CR here
+					toUpdate, err := initMaintenanceStatus(ctx, nm, drainer)
+					Expect(toUpdate).To(BeTrue())
+					Expect(err).NotTo(HaveOccurred())
 					By("Setting owner ref for a modified nm CR")
 					node := &corev1.Node{}
 					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, node)).To(Succeed())
@@ -101,8 +103,9 @@ var _ = Describe("Node Maintenance", func() {
 				It("Should not modify the CR after initalization", func() {
 					nmCopy := nm.DeepCopy()
 					nmCopy.Status.Phase = v1beta1.MaintenanceFailed
-					Expect(initMaintenanceStatus(ctx, nmCopy, drainer)).Error().NotTo(HaveOccurred())
-					// status was not initialized thus the function succeeds
+					toUpdate, err := initMaintenanceStatus(ctx, nmCopy, drainer)
+					Expect(toUpdate).To(BeFalse())
+					Expect(err).NotTo(HaveOccurred())
 					Expect(nmCopy.Status.Phase).To(Equal(v1beta1.MaintenanceFailed))
 					Expect(len(nmCopy.Status.PendingPods)).To(Equal(0))
 					Expect(nmCopy.Status.EvictionPods).To(Equal(0))
