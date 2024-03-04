@@ -56,7 +56,7 @@ func AddOrRemoveTaint(clientset kubernetes.Interface, add bool, node *corev1.Nod
 			return err
 		}
 		taintStr = "remove"
-		log.Infof("Maintenance taints  will be removed from node %s", node.Name)
+		log.Infof("Maintenance taints will be removed from node %s", node.Name)
 		patch = fmt.Sprintf(`{ "op": "replace", "path": "/spec/taints", "value": %s }`, string(removeTaints))
 	}
 

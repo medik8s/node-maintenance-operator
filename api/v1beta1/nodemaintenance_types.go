@@ -53,10 +53,10 @@ type NodeMaintenanceSpec struct {
 	// +kubebuilder:validation:Type:=string
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	EvictionTimeout metav1.Duration `json:"evictionTimeout,omitempty"`
-	// Node name to apply maintanance on/off
+	// Node name to apply maintenance on/off
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	NodeName string `json:"nodeName"`
-	// Reason for maintanance
+	// Reason for maintenance
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	Reason string `json:"reason,omitempty"`
 }

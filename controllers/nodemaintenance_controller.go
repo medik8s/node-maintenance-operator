@@ -52,7 +52,6 @@ const (
 	//lease consts
 	LeaseHolderIdentity = "node-maintenance"
 	LeaseDuration       = 3600 * time.Second
-	DrainerTimeout      = 30 * time.Second
 )
 
 // NodeMaintenanceReconciler reconciles a NodeMaintenance object
@@ -229,7 +228,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 // createDrainer creates a drain.Helper struct for external cordon and drain API
-func createDrainer(ctx context.Context, evicitonTimeout time.Duration, mgrConfig *rest.Config) (*drain.Helper, error) {
+func createDrainer(ctx context.Context, evictionTimeout time.Duration, mgrConfig *rest.Config) (*drain.Helper, error) {
 	drainer := &drain.Helper{}
 
 	//Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.
@@ -255,7 +254,7 @@ func createDrainer(ctx context.Context, evicitonTimeout time.Duration, mgrConfig
 	drainer.GracePeriodSeconds = -1
 
 	//The length of time to wait before giving up, zero means infinite
-	drainer.Timeout = evicitonTimeout
+	drainer.Timeout = evictionTimeout
 
 	cs, err := kubernetes.NewForConfig(mgrConfig)
 	if err != nil {

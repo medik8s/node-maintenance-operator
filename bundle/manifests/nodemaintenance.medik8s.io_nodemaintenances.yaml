@@ -52,10 +52,10 @@ spec:
                 pattern: ^(0|([0-9]+(\.[0-9]+)?(ms|s|m|h)))$
                 type: string
               nodeName:
-                description: Node name to apply maintanance on/off
+                description: Node name to apply maintenance on/off
                 type: string
               reason:
-                description: Reason for maintanance
+                description: Reason for maintenance
                 type: string
             required:
             - nodeName

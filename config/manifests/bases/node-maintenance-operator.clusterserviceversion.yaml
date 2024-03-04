@@ -33,10 +33,10 @@ spec:
           "h".
         displayName: Eviction Timeout
         path: evictionTimeout
-      - description: Node name to apply maintanance on/off
+      - description: Node name to apply maintenance on/off
         displayName: Node Name
         path: nodeName
-      - description: Reason for maintanance
+      - description: Reason for maintenance
         displayName: Reason
         path: reason
       statusDescriptors:
