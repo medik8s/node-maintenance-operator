@@ -148,10 +148,16 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return emptyResult, nil
 	}
 
-	err = initMaintenanceStatus(ctx, nm, drainer, r.Client)
+	needUpdate, err := initMaintenanceStatus(ctx, nm, drainer)
 	if err != nil {
-		r.logger.Error(err, "Failed to update NodeMaintenance with \"Running\" status")
+		r.logger.Error(err, "Failed to initalize NodeMaintenance status")
 		return r.onReconcileError(ctx, nm, drainer, err)
+	}
+	if needUpdate {
+		if err = r.Client.Status().Update(ctx, nm); err != nil {
+			r.logger.Error(err, "Failed to update NodeMaintenance with \"Running\" status")
+			return r.onReconcileError(ctx, nm, drainer, err)
+		}
 	}
 
 	nodeName := nm.Spec.NodeName
@@ -390,13 +396,15 @@ func (r *NodeMaintenanceReconciler) fetchNode(ctx context.Context, drainer *drai
 	return node, nil
 }
 
-func initMaintenanceStatus(ctx context.Context, nm *v1beta1.NodeMaintenance, drainer *drain.Helper, r client.Client) error {
+// initMaintenanceStatus initializes the nm CR status only at the first time, when phase is empty,
+// It returns a bool whether we should update the CR status and an error if it can't be initialized
+func initMaintenanceStatus(ctx context.Context, nm *v1beta1.NodeMaintenance, drainer *drain.Helper) (bool, error) {
 	if nm.Status.Phase == "" {
 		nm.Status.Phase = v1beta1.MaintenanceRunning
 		setLastUpdate(nm)
 		pendingList, errlist := drainer.GetPodsForDeletion(nm.Spec.NodeName)
 		if errlist != nil {
-			return fmt.Errorf("failed to get pods for eviction while initializing status")
+			return false, fmt.Errorf("failed to get pods for eviction while initializing status")
 		}
 		if pendingList != nil {
 			nm.Status.PendingPods = GetPodNameList(pendingList.Pods())
@@ -409,13 +417,12 @@ func initMaintenanceStatus(ctx context.Context, nm *v1beta1.NodeMaintenance, dra
 				FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nm.Spec.NodeName}).String(),
 			})
 		if err != nil {
-			return err
+			return false, err
 		}
 		nm.Status.TotalPods = len(podlist.Items)
-		err = r.Status().Update(ctx, nm)
-		return err
+		return true, nil
 	}
-	return nil
+	return false, nil
 }
 
 func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(ctx context.Context, nm *v1beta1.NodeMaintenance, drainer *drain.Helper, err error, duration *time.Duration) (ctrl.Result, error) {
