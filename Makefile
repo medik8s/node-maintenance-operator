@@ -46,6 +46,7 @@ export DEFAULT_CHANNEL
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
+CI_VERSION := 9.9.9-dummy
 VERSION ?= $(DEFAULT_VERSION)
 PREVIOUS_VERSION ?= $(DEFAULT_VERSION)
 export VERSION
@@ -213,10 +214,10 @@ bundle-update: verify-previous-version ## Update CSV fields and validate the bun
 
 .PHONY: verify-previous-version
 verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
-	@if [ $(VERSION) != $(DEFAULT_VERSION) ] && [ $(PREVIOUS_VERSION) = $(DEFAULT_VERSION) ]; then \
-  			echo "Error: PREVIOUS_VERSION must be set for the selected VERSION"; \
-    		exit 1; \
-    fi
+	@if [ $(VERSION) != $(DEFAULT_VERSION) ] && [ $(VERSION) != $(CI_VERSION) ] && [ $(PREVIOUS_VERSION) = $(DEFAULT_VERSION) ]; then \
+		echo "Error: PREVIOUS_VERSION must be set for the selected VERSION"; \
+    	exit 1; \
+	fi
 
 .PHONY: bundle-reset-date
 bundle-reset-date: ## Reset bundle's createdAt
