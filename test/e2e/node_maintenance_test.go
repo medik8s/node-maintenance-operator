@@ -145,8 +145,8 @@ var _ = Describe("Starting Maintenance", func() {
 
 		var (
 			maintenanceNodeName string
-			nodeMaintenance *nmo.NodeMaintenance
-			startTime time.Time
+			nodeMaintenance     *nmo.NodeMaintenance
+			startTime           time.Time
 		)
 
 		BeforeEach(func() {

@@ -9,19 +9,17 @@ import (
 const (
 	// events reasons
 	EventReasonBeginMaintenance   = "BeginMaintenance"
-	EventReasonEvictingPods       = "EvictingPods"
 	EventReasonFailedMaintenance  = "FailedMaintenance"
 	EventReasonSucceedMaintenance = "SucceedMaintenance"
 	EventReasonUncordonNode       = "UncordonNode"
 	EventReasonRemovedMaintenance = "RemovedMaintenance"
 
 	// events messages
-	EventMessageBeginMaintenance   = "Begin maintenance"
-	EventMessageEvictingPods       = "Evicting pods"
-	EventMessageFailedMaintenance  = "Failed maintenance"
-	EventMessageSucceedMaintenance = "Node maintenance was succeed"
-	EventMessageUncordonNode       = "Uncordon node"
-	EventMessageRemovedMaintenance = "Removed maintenance"
+	EventMessageBeginMaintenance   = "Begin a node maintenance"
+	EventMessageFailedMaintenance  = "Failed a node maintenance"
+	EventMessageSucceedMaintenance = "Node maintenance was succeeded"
+	EventMessageUncordonNode       = "Uncordon a node"
+	EventMessageRemovedMaintenance = "Removed a node maintenance"
 )
 
 // NormalEvent will record an event with type Normal and fixed message.

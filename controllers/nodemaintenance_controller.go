@@ -50,6 +50,7 @@ const (
 	maxAllowedErrorToUpdateOwnedLease = 3
 	waitDurationOnDrainError          = 5 * time.Second
 	FixedDurationReconcileLog         = "Reconciling with fixed duration"
+	nodeNotFoundError                 = "nodes \"%s\" not found"
 
 	//lease consts
 	LeaseHolderIdentity = "node-maintenance"
@@ -122,16 +123,16 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	drainer, err := createDrainer(ctx, r.MgrConfig)
 	if err != nil {
 		return emptyResult, err
-		// Add finalizer when object is created
 	}
 
 	if !controllerutil.ContainsFinalizer(nm, v1beta1.NodeMaintenanceFinalizer) && nm.ObjectMeta.DeletionTimestamp.IsZero() {
+		// Add finalizer when object is created
 		controllerutil.AddFinalizer(nm, v1beta1.NodeMaintenanceFinalizer)
-		// begin maintenance on adding finalizer
-		utils.NormalEvent(r.Recorder, nm, utils.EventReasonBeginMaintenance, utils.EventMessageBeginMaintenance)
 		if err := r.Client.Update(ctx, nm); err != nil {
 			return r.onReconcileError(ctx, nm, drainer, err)
 		}
+		// begin maintenance on adding finalizer
+		utils.NormalEvent(r.Recorder, nm, utils.EventReasonBeginMaintenance, utils.EventMessageBeginMaintenance)
 	} else if controllerutil.ContainsFinalizer(nm, v1beta1.NodeMaintenanceFinalizer) && !nm.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is being deleted
 		r.logger.Info("Deletion timestamp not zero")
@@ -146,11 +147,11 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		// Remove finalizer
 		controllerutil.RemoveFinalizer(nm, v1beta1.NodeMaintenanceFinalizer)
-		// end maintenance on removing finalizer, taints, and node is already uncordoned
-		utils.NormalEvent(r.Recorder, nm, utils.EventReasonRemovedMaintenance, utils.EventMessageRemovedMaintenance)
 		if err := r.Client.Update(ctx, nm); err != nil {
 			return r.onReconcileError(ctx, nm, drainer, err)
 		}
+		// end maintenance on removing finalizer, taints, and node is already uncordoned
+		utils.NormalEvent(r.Recorder, nm, utils.EventReasonRemovedMaintenance, utils.EventMessageRemovedMaintenance)
 		return emptyResult, nil
 	}
 
@@ -203,7 +204,6 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if nm.Status.Phase != v1beta1.MaintenanceRunning || nm.Status.ErrorOnLeaseCount != 0 {
 			nm.Status.Phase = v1beta1.MaintenanceRunning
 			// Another chance to evict pods - clear ErrorOnLeaseCount and try again to put the node under maintenance
-			utils.NormalEvent(r.Recorder, nm, utils.EventReasonEvictingPods, utils.EventMessageEvictingPods)
 			nm.Status.ErrorOnLeaseCount = 0
 
 		}
@@ -227,8 +227,6 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	if err = drain.RunNodeDrain(drainer, nodeName); err != nil {
 		r.logger.Info("Not all pods evicted", "nodeName", nodeName, "error", err)
-		// maintenance in progress - some pods haven't been evicted
-		utils.NormalEvent(r.Recorder, nm, utils.EventReasonEvictingPods, utils.EventMessageEvictingPods)
 		waitOnReconcile := waitDurationOnDrainError
 		return r.onReconcileErrorWithRequeue(ctx, nm, drainer, err, &waitOnReconcile)
 	} else if nm.Status.Phase != v1beta1.MaintenanceSucceeded {
@@ -380,7 +378,7 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, 
 		return err
 	}
 
-	// end maintenance on removing finalizer - taints have been removed and node was uncordoned
+	// stop maintenance -  remove the added taints and uncordon the node
 	utils.NormalEvent(r.Recorder, node, utils.EventReasonUncordonNode, utils.EventMessageUncordonNode)
 	if err := r.LeaseManager.InvalidateLease(ctx, node); err != nil {
 		return err
@@ -460,6 +458,10 @@ func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(ctx context.Cont
 	updateErr := r.Client.Status().Update(ctx, nm)
 	if updateErr != nil {
 		r.logger.Error(updateErr, "Failed to update NodeMaintenance with \"Failed\" status")
+	}
+	if nm.Spec.NodeName != "" && err.Error() == fmt.Sprintf(nodeNotFoundError, nm.Spec.NodeName) {
+		// don't return an error in case of a missing node, as it won't be found in the future.
+		return ctrl.Result{}, nil
 	}
 	if duration != nil {
 		r.logger.Info(FixedDurationReconcileLog)

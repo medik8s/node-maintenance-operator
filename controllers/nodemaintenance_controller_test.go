@@ -250,7 +250,7 @@ var _ = Describe("Node Maintenance", func() {
 				Expect(maintenance.Status.Phase).To(Equal(v1beta1.MaintenanceFailed))
 				verifyEvent(corev1.EventTypeNormal, utils.EventReasonBeginMaintenance, utils.EventMessageBeginMaintenance)
 				verifyEvent(corev1.EventTypeWarning, utils.EventReasonFailedMaintenance, utils.EventMessageFailedMaintenance)
-				verifyNoEvent(corev1.EventTypeNormal, utils.EventReasonEvictingPods, utils.EventMessageEvictingPods)
+				verifyNoEvent(corev1.EventTypeNormal, utils.EventReasonSucceedMaintenance, utils.EventMessageSucceedMaintenance)
 			})
 		})
 	})
