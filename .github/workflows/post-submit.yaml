@@ -34,7 +34,7 @@ jobs:
       - name: Build and push versioned CSV and images for tags
         if: ${{ github.ref_type == 'tag' }}
         # remove leading 'v' from tag!
-        run: export VERSION=$(echo $GITHUB_REF_NAME | sed 's/v//') && export DUMMY_VERSION="9.9.9-ci" && make container-build-and-push-community
+        run: export VERSION=$(echo $GITHUB_REF_NAME | sed 's/v//') && export SKIP_VERIFY_PREVIOUS_VERSION="true" && make container-build-and-push-community
 
       - name: Create release with manifests
         if: ${{ github.ref_type == 'tag' }}
