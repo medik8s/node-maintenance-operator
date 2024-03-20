@@ -50,7 +50,8 @@ const (
 	maxAllowedErrorToUpdateOwnedLease = 3
 	waitDurationOnDrainError          = 5 * time.Second
 	FixedDurationReconcileLog         = "Reconciling with fixed duration"
-	nodeNotFoundError                 = "nodes \"%s\" not found"
+	// An expected error from fetchNode function
+	expectedNodeNotFoundErrorMsg      = "nodes \"%s\" not found"
 
 	//lease consts
 	LeaseHolderIdentity = "node-maintenance"
@@ -378,7 +379,7 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, 
 		return err
 	}
 
-	// stop maintenance -  remove the added taints and uncordon the node
+	// stop maintenance - remove the added taints and uncordon the node
 	utils.NormalEvent(r.Recorder, node, utils.EventReasonUncordonNode, utils.EventMessageUncordonNode)
 	if err := r.LeaseManager.InvalidateLease(ctx, node); err != nil {
 		return err
@@ -459,7 +460,7 @@ func (r *NodeMaintenanceReconciler) onReconcileErrorWithRequeue(ctx context.Cont
 	if updateErr != nil {
 		r.logger.Error(updateErr, "Failed to update NodeMaintenance with \"Failed\" status")
 	}
-	if nm.Spec.NodeName != "" && err.Error() == fmt.Sprintf(nodeNotFoundError, nm.Spec.NodeName) {
+	if nm.Spec.NodeName != "" && err.Error() == fmt.Sprintf(expectedNodeNotFoundErrorMsg, nm.Spec.NodeName) {
 		// don't return an error in case of a missing node, as it won't be found in the future.
 		return ctrl.Result{}, nil
 	}
