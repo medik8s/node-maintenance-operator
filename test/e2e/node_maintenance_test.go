@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -18,25 +19,33 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nmo "github.com/medik8s/node-maintenance-operator/api/v1beta1"
 	nodemaintenance "github.com/medik8s/node-maintenance-operator/controllers"
+	"github.com/medik8s/node-maintenance-operator/pkg/utils"
 )
 
-var (
-	retryInterval   = time.Second * 5
-	timeout         = time.Second * 120
-	testDeployment  = "test-deployment"
-	testMaintenance = "test-maintenance"
-	podLabel        = map[string]string{"test": "drain"}
+const (
+	maintenanceKind       = "NodeMaintenance"
+	testWorkerMaintenance = "test-maintenance"
+	retryInterval         = time.Second * 5
+	eventInterval         = time.Second * 10
+	timeout               = time.Second * 120
+	testDeployment        = "test-deployment"
 )
+
+var podLabel = map[string]string{"test": "drain"}
 
 var _ = Describe("Starting Maintenance", func() {
 
-	var controlPlaneNodes, workers []string
-	var controPlaneMaintenance *nmo.NodeMaintenance
+	var (
+		controlPlaneNodes, workers []string
+		objectName                 string
+		controPlaneMaintenance     *nmo.NodeMaintenance
+	)
 
 	BeforeEach(func() {
 		if controlPlaneNodes == nil {
@@ -58,7 +67,8 @@ var _ = Describe("Starting Maintenance", func() {
 			if controPlaneMaintenance == nil {
 				// do this once only
 				controlPlaneNode = controlPlaneNodes[0]
-				controPlaneMaintenance = getNodeMaintenance(fmt.Sprintf("test-1st-control-plane-%s", controlPlaneNode), controlPlaneNode)
+				objectName = fmt.Sprintf("test-1st-control-plane-%s", controlPlaneNode)
+				controPlaneMaintenance = getNodeMaintenance(objectName, controlPlaneNode)
 				err = createCRIgnoreUnrelatedErrors(controPlaneMaintenance)
 			}
 		})
@@ -68,6 +78,7 @@ var _ = Describe("Starting Maintenance", func() {
 				Skip("cluster has less than 3 master/control-plane nodes and is to small for running this test")
 			}
 			Expect(err).ToNot(HaveOccurred())
+			verifyEvent(context.Background(), utils.EventReasonBeginMaintenance, objectName)
 		})
 
 		It("should fail", func() {
@@ -79,6 +90,7 @@ var _ = Describe("Starting Maintenance", func() {
 			// on k8s the fake etcd-quorum-guard PDB should do as well
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(nmo.ErrorControlPlaneQuorumViolation, controlPlaneNode), "Unexpected error message")
+			verifyNoEvent(context.Background(), utils.EventReasonBeginMaintenance, objectName)
 		})
 	})
 
@@ -107,151 +119,108 @@ var _ = Describe("Starting Maintenance", func() {
 			time.Sleep(10 * time.Second)
 
 			controlPlaneNode := controlPlaneNodes[1]
-			nodeMaintenance := getNodeMaintenance(fmt.Sprintf("test-2nd-control-plane-%s", controlPlaneNode), controlPlaneNode)
+			objectName = fmt.Sprintf("test-2nd-control-plane-%s", controlPlaneNode)
+			nodeMaintenance := getNodeMaintenance(objectName, controlPlaneNode)
 
 			err := createCRIgnoreUnrelatedErrors(nodeMaintenance)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(nmo.ErrorControlPlaneQuorumViolation, controlPlaneNode), "Unexpected error message")
+			verifyNoEvent(context.Background(), utils.EventReasonBeginMaintenance, objectName)
 		})
 	})
 
 	Context("for a not existing node", func() {
 		It("should fail", func() {
 			nodeName := "doesNotExist"
-			nodeMaintenance := getNodeMaintenance("test-unexisting", nodeName)
+			objectName = "test-unexisting"
+			nodeMaintenance := getNodeMaintenance(objectName, nodeName)
 			err := createCRIgnoreUnrelatedErrors(nodeMaintenance)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf(nmo.ErrorNodeNotExists, nodeName)), "Unexpected error message")
+			verifyNoEvent(context.Background(), utils.EventReasonBeginMaintenance, objectName)
 		})
 	})
 
 	Context("for a worker node", func() {
 
-		var maintenanceNodeName string
-		var nodeMaintenance *nmo.NodeMaintenance
-		var startTime time.Time
+		var (
+			maintenanceNodeName string
+			nodeMaintenance     *nmo.NodeMaintenance
+			startTime           time.Time
+		)
 
 		BeforeEach(func() {
-			// do this once only
-			if nodeMaintenance == nil {
-				startTime = time.Now()
-				createTestDeployment()
-				maintenanceNodeName = getTestDeploymentNodeName()
-				nodeMaintenance = getNodeMaintenance(testMaintenance, maintenanceNodeName)
-			}
+			startTime = time.Now()
+			createTestDeployment()
+			maintenanceNodeName = getTestDeploymentNodeName()
+			nodeMaintenance = getNodeMaintenance(testWorkerMaintenance, maintenanceNodeName)
 		})
+		It("shoud put the node under maintenance", func() {
+			By("nm maintenance CR creation")
+			Expect(createCRIgnoreUnrelatedErrors(nodeMaintenance)).To(Succeed())
 
-		It("should succeed", func() {
-			err := createCRIgnoreUnrelatedErrors(nodeMaintenance)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("should prevent creating another maintenance for the same node", func() {
+			By("Preventing the creation of another maintenance CR for the same node")
 			nmDuplicate := getNodeMaintenance("test-duplicate", maintenanceNodeName)
 			err := createCRIgnoreUnrelatedErrors(nmDuplicate)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf(nmo.ErrorNodeMaintenanceExists, maintenanceNodeName)), "Unexpected error message")
-		})
 
-		It("should prevent updating the node name", func() {
+			By("Preventing the update of node name")
 			nmCopy := nodeMaintenance.DeepCopy()
 			nmCopy.Spec.NodeName = "some-random-nodename"
-			err := Client.Patch(context.TODO(), nmCopy, client.MergeFrom(nodeMaintenance), &client.PatchOptions{})
+			err = Client.Patch(context.TODO(), nmCopy, client.MergeFrom(nodeMaintenance), &client.PatchOptions{})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(nmo.ErrorNodeNameUpdateForbidden), "Unexpected error message")
-		})
 
-		It("should report started maintenance", func() {
-			Eventually(func() (bool, error) {
-				nm := &nmo.NodeMaintenance{}
-				if err := Client.Get(context.TODO(), types.NamespacedName{Name: nodeMaintenance.Name}, nm); err != nil {
-					return false, err
-				}
+			verifyEvent(context.Background(), utils.EventReasonBeginMaintenance, testWorkerMaintenance)
+			verifyEvent(context.Background(), utils.EventReasonSucceedMaintenance, testWorkerMaintenance)
 
-				if nm.Status.Phase != nmo.MaintenanceRunning {
-					logInfof("phase: %s\n", nm.Status.Phase)
-					return false, nil
-				}
-
-				return true, nil
-			}, 60*time.Second, 5*time.Second).Should(BeTrue(), "maintenance did not start in time")
-		})
-
-		It("should report succeeded maintenance", func() {
-			Eventually(func() (bool, error) {
-				nm := &nmo.NodeMaintenance{}
-				if err := Client.Get(context.TODO(), types.NamespacedName{Name: nodeMaintenance.Name}, nm); err != nil {
-					return false, err
-				}
-
-				if nm.Status.Phase != nmo.MaintenanceSucceeded {
-					logInfof("phase: %s\n", nm.Status.Phase)
-					return false, nil
-				}
-
-				return true, nil
-			}, 300*time.Second, 10*time.Second).Should(BeTrue(), "maintenance did not succeed in time")
-		})
-
-		It("should have been reconciled with fixed duration at least once", func() {
 			// check operator log showing it reconciled with fixed duration because of drain timeout
 			// it should be caused by the test deployment's termination graceperiod > drain timeout
 			Expect(getOperatorLogs()).To(ContainSubstring(nodemaintenance.FixedDurationReconcileLog))
-		})
 
-		It("should result in unschedulable and tainted node", func() {
+			By("node should be unschedulable and tainted node")
 			node := &corev1.Node{}
-			err := Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: maintenanceNodeName}, node)
+			err = Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: maintenanceNodeName}, node)
 			Expect(err).ToNot(HaveOccurred(), "failed to get node")
 			Expect(node.Spec.Unschedulable).To(BeTrue(), "node should have been unschedulable")
 			Expect(isTainted(node)).To(BeTrue(), "node should have had the medik8s taint")
-		})
 
-		It("should result in a valid lease object", func() {
 			hasValidLease(maintenanceNodeName, startTime)
-		})
 
-		It("should move test workload to another worker node", func() {
+			By("verify test workload moved to another worker node")
 			if len(workers) < 2 {
 				Skip("this doesn't work with 1 worker node only")
 			}
 			waitForTestDeployment(1)
 			nodeName := getTestDeploymentNodeName()
-			Expect(nodeName).ToNot(Equal(maintenanceNodeName), "workload should run on a new node now")
-		})
+			Expect(nodeName).NotTo(Equal(maintenanceNodeName), "workload should run on a new node now")
 
-		Context("ending maintenance", func() {
+			By("nm maintenance CR deletion")
+			Expect(Client.Delete(context.TODO(), nodeMaintenance)).To(Succeed(), "failed to delete node maintenance")
 
-			It("should succeed", func() {
-				err := Client.Delete(context.TODO(), nodeMaintenance)
-				Expect(err).ToNot(HaveOccurred(), "failed to delete node maintenance")
-			})
+			By("node status should be resetted after CR deletion")
+			Eventually(func() (bool, error) {
+				node := &corev1.Node{}
+				if err := Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: maintenanceNodeName}, node); err != nil {
+					return false, err
+				}
+				if node.Spec.Unschedulable {
+					logInfoln("node is still unschedulable")
+					return false, nil
+				}
+				if isTainted(node) {
+					logInfoln("node is still tainted")
+					return false, nil
+				}
+				return true, nil
+			}, 60*time.Second, 10*time.Second).Should(BeTrue(), "node should be resetted")
 
-			It("should result in resetted node status", func() {
-				Eventually(func() (bool, error) {
-					node := &corev1.Node{}
-					if err := Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: maintenanceNodeName}, node); err != nil {
-						return false, err
-					}
-					if node.Spec.Unschedulable {
-						logInfoln("node is still unschedulable")
-						return false, nil
-					}
-					if isTainted(node) {
-						logInfoln("node is still tainted")
-						return false, nil
-					}
-					return true, nil
-				}, 60*time.Second, 10*time.Second).Should(BeTrue(), "node should be resetted")
-			})
+			verifyEvent(context.Background(), utils.EventReasonRemovedMaintenance, testWorkerMaintenance)
 
-			It("should have invalidated the lease", func() {
-				isLeaseInvalidated(maintenanceNodeName)
-			})
-
-			It("test deployment should still be running", func() {
-				waitForTestDeployment(1)
-			})
+			By("verify lease was invalidated and there is at least one available replica")
+			isLeaseInvalidated(maintenanceNodeName)
+			waitForTestDeployment(1)
 
 		})
 
@@ -284,14 +253,14 @@ func getNodes() ([]string, []string) {
 	return controlPlaneNodes, workers
 }
 
-func getNodeMaintenance(name, nodeName string) *nmo.NodeMaintenance {
+func getNodeMaintenance(objectname, nodeName string) *nmo.NodeMaintenance {
 	return &nmo.NodeMaintenance{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "NodeMaintenance",
+			Kind:       maintenanceKind,
 			APIVersion: "nodemaintenance.medik8s.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "nodemaintenance-" + name,
+			Name: objectname,
 		},
 		Spec: nmo.NodeMaintenanceSpec{
 			NodeName: nodeName,
@@ -384,6 +353,8 @@ func createTestDeployment() {
 	waitForTestDeployment(2)
 }
 
+// waitForTestDeployment verifies whether the test deployment exists with a replica >=1
+// offset is used as the offset of EventuallyWithOffset function that verifies the test deployment existance
 func waitForTestDeployment(offset int) {
 
 	EventuallyWithOffset(offset, func() error {
@@ -409,6 +380,7 @@ func waitForTestDeployment(offset int) {
 
 func getTestDeploymentNodeName() string {
 	pods := getTestDeploymentPods()
+	ExpectWithOffset(2, len(pods.Items)).ToNot(BeZero(), "no operator pod found")
 	nodeName := pods.Items[0].Spec.NodeName
 	return nodeName
 }
@@ -486,4 +458,44 @@ func isLeaseInvalidated(nodeName string) {
 	lease := &coordv1.Lease{}
 	err := Client.Get(context.TODO(), types.NamespacedName{Namespace: leaseNs, Name: fmt.Sprintf("node-%s", nodeName)}, lease)
 	Expect(apierrors.IsNotFound(err)).To(BeTrue())
+}
+
+// waitForEvent polls the filtered events and returns an error if it could not find the desired event
+// by its name and reason
+func waitForEvent(ctx context.Context, eventReason, eventIdentifier string) error {
+	// Wait for events with a timeout
+	return wait.PollUntilContextTimeout(ctx, retryInterval, timeout, true, func(ctx context.Context) (bool, error) {
+		events, err := KubeClient.CoreV1().Events("").List(ctx, metav1.ListOptions{
+			FieldSelector: fmt.Sprintf("involvedObject.kind=%s", maintenanceKind),
+		})
+		if err != nil {
+			return false, fmt.Errorf("Error listing events: %v", err)
+		}
+
+		// go over all nm CR events, and find an event that match the event reason and contains the desired name identifier
+		for _, event := range events.Items {
+			if strings.Contains(event.Name, eventIdentifier) && event.Reason == eventReason {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+}
+
+// verifyEvent expects to find an event based on its reason and the identifier
+func verifyEvent(ctx context.Context, eventReason, eventIdentifier string) {
+	By(fmt.Sprintf("Verifying that event %s was created for %s nm CR", eventReason, eventIdentifier))
+	err := waitForEvent(ctx, eventReason, eventIdentifier)
+	if err != nil {
+		fmt.Printf("Error waiting for events: %v", err)
+	}
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Event %s was missing for %s nm CR", eventReason, eventIdentifier))
+}
+
+// verifyNoEvent expects to fail on finding an event based on its reason and the identifier
+func verifyNoEvent(ctx context.Context, eventReason, eventIdentifier string) {
+	By(fmt.Sprintf("Verifying that event %s was not created for %s nm CR", eventReason, eventIdentifier))
+	// check error as indication of missing event
+	Expect(waitForEvent(ctx, eventReason, eventIdentifier)).To(HaveOccurred(),
+		fmt.Sprintf("Event %s existed for %s nm CR", eventReason, eventIdentifier))
 }

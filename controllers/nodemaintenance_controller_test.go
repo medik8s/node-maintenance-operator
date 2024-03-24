@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/medik8s/node-maintenance-operator/api/v1beta1"
+	utils "github.com/medik8s/node-maintenance-operator/pkg/utils"
 )
 
 const (
@@ -181,6 +182,7 @@ var _ = Describe("Node Maintenance", func() {
 			Expect(k8sClient.Create(ctx, podTwo)).To(Succeed())
 			DeferCleanup(cleanupPod, ctx, podOne)
 			DeferCleanup(cleanupPod, ctx, podTwo)
+			DeferCleanup(clearEvents)
 		})
 		JustBeforeEach(func() {
 			// Sleep for a second to ensure dummy reconciliation has begun running before the unit tests
@@ -205,6 +207,7 @@ var _ = Describe("Node Maintenance", func() {
 				Expect(maintenance.Status.LastError).To(Equal(""))
 				Expect(maintenance.Status.LastUpdate).NotTo(BeZero())
 				Expect(maintenance.Status.ErrorOnLeaseCount).To(Equal(0))
+				verifyEvent(corev1.EventTypeNormal, utils.EventReasonSucceedMaintenance, utils.EventMessageSucceedMaintenance)
 
 				By("Check whether node was cordoned")
 				node := &corev1.Node{}
@@ -222,6 +225,7 @@ var _ = Describe("Node Maintenance", func() {
 				Expect(k8sClient.Delete(ctx, nm)).To(Succeed())
 				// Sleep for a second to ensure dummy reconciliation has begun running before the unit tests
 				time.Sleep(1 * time.Second)
+				verifyEvent(corev1.EventTypeNormal, utils.EventReasonRemovedMaintenance, utils.EventMessageRemovedMaintenance)
 
 				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: nm.Spec.NodeName}, node)).NotTo(HaveOccurred())
 				_, exist := node.Labels[commonLabels.ExcludeFromRemediation]
@@ -239,7 +243,6 @@ var _ = Describe("Node Maintenance", func() {
 				maintenance := &v1beta1.NodeMaintenance{}
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
 
-				Expect(maintenance.Status.Phase).To(Equal(v1beta1.MaintenanceRunning))
 				Expect(len(maintenance.Status.PendingPods)).To(Equal(0))
 				Expect(maintenance.Status.EvictionPods).To(Equal(0))
 				Expect(maintenance.Status.TotalPods).To(Equal(0))
@@ -247,6 +250,10 @@ var _ = Describe("Node Maintenance", func() {
 				Expect(maintenance.Status.LastError).To(Equal(fmt.Sprintf("nodes \"%s\" not found", invalidNodeName)))
 				Expect(maintenance.Status.LastUpdate).NotTo(BeZero())
 				Expect(maintenance.Status.ErrorOnLeaseCount).To(Equal(0))
+				Expect(maintenance.Status.Phase).To(Equal(v1beta1.MaintenanceFailed))
+				verifyEvent(corev1.EventTypeNormal, utils.EventReasonBeginMaintenance, utils.EventMessageBeginMaintenance)
+				verifyEvent(corev1.EventTypeWarning, utils.EventReasonFailedMaintenance, utils.EventMessageFailedMaintenance)
+				verifyNoEvent(corev1.EventTypeNormal, utils.EventReasonSucceedMaintenance, utils.EventMessageSucceedMaintenance)
 			})
 		})
 	})
@@ -348,6 +355,56 @@ func getTestNM(crName, nodeName string) *v1beta1.NodeMaintenance {
 			Reason:   "test reason",
 		},
 	}
+}
+
+func verifyEvent(eventType, eventReason, eventMessage string) {
+	By(fmt.Sprintf("Verifying that event %s was created", eventReason))
+	isEventMatch := isEventOccurred(eventType, eventReason, eventMessage)
+	ExpectWithOffset(1, isEventMatch).To(BeTrue())
+}
+
+func verifyNoEvent(eventType, eventReason, eventMessage string) {
+	By(fmt.Sprintf("Verifying that event %s was not created", eventReason))
+	isEventMatch := isEventOccurred(eventType, eventReason, eventMessage)
+	ExpectWithOffset(1, isEventMatch).To(BeFalse())
+}
+
+// isEventOccurred checks whether an event has occoured
+func isEventOccurred(eventType, eventReason, eventMessage string) bool {
+	expected := fmt.Sprintf("%s %s %s", eventType, eventReason, eventMessage)
+	isEventMatch := false
+
+	unMatchedEvents := make(chan string, len(fakeRecorder.Events))
+	isDone := false
+	for {
+		select {
+		case event := <-fakeRecorder.Events:
+			if isEventMatch = event == expected; isEventMatch {
+				isDone = true
+			} else {
+				unMatchedEvents <- event
+			}
+		default:
+			isDone = true
+		}
+		if isDone {
+			break
+		}
+	}
+
+	close(unMatchedEvents)
+	for unMatchedEvent := range unMatchedEvents {
+		fakeRecorder.Events <- unMatchedEvent
+	}
+	return isEventMatch
+}
+
+// clearEvents loop over the events channel until it is empty from events
+func clearEvents() {
+	for len(fakeRecorder.Events) > 0 {
+		<-fakeRecorder.Events
+	}
+	testLog.Info("Cleanup: events list is empty")
 }
 
 type mockLeaseManager struct {
