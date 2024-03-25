@@ -425,15 +425,14 @@ bundle-build-community: bundle-community ## Run bundle community changes in CSV,
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: container-build-community
-container-build-community: check  ## Build containers for community
-	$(DOCKER_GO) "make bundle-community"
-	make docker-build bundle-build-community
+container-build-community: docker-build bundle-build-community ## Build containers for community
 
 .PHONY: container-push 
 container-push: docker-push bundle-push catalog-build catalog-push## Push containers (NOTE: catalog can't be build before bundle was pushed)
 
 .PHONY: container-build-and-push-community
 container-build-and-push-community: container-build-community container-push ## Build four images, update CSV for community, and push all the images to Quay (docker, bundle, and catalog).
+
 .PHONY: cluster-functest 
 cluster-functest: ginkgo ## Run e2e tests in a real cluster
 	./hack/functest.sh $(GINKGO_VERSION)
