@@ -408,8 +408,8 @@ catalog-push: ## Push a catalog image.
 ##@ Targets used by CI
 
 .PHONY: check 
-check: ## Dockerized version of make test-no-verify
-	$(DOCKER_GO) "make test-no-verify"
+check: ## Dockerized version of make test
+	$(DOCKER_GO) "make test"
 
 .PHONY: verify-unchanged
 verify-unchanged: ## Verify there are no un-committed changes
