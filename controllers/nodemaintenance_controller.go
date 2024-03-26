@@ -51,7 +51,7 @@ const (
 	waitDurationOnDrainError          = 5 * time.Second
 	FixedDurationReconcileLog         = "Reconciling with fixed duration"
 	// An expected error from fetchNode function
-	expectedNodeNotFoundErrorMsg      = "nodes \"%s\" not found"
+	expectedNodeNotFoundErrorMsg = "nodes \"%s\" not found"
 
 	//lease consts
 	LeaseHolderIdentity = "node-maintenance"
