@@ -65,4 +65,4 @@ jobs: # jobs to run
       run: PREVIOUS_VERSION=${{env.NMO_PREVIOUS_VERSION}} VERSION=${{env.NMO_VERSION}} make bundle-community
 
     - name: Run scorecard tests
-      run: OPERATOR_NAMESPACE=${{env.DEPLOY_NAMESPACE}} make test-scorecard
+      run: OPERATOR_NAMESPACE=default make test-scorecard
