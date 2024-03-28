@@ -29,14 +29,10 @@ jobs: # jobs to run
     name: Test Scorecard Tests # https://sdk.operatorframework.io/docs/testing-operators/scorecard/
     runs-on: ubuntu-22.04
     env:
-      IMAGE_REGISTRY: kind-registry:5000
-      DEPLOY_NAMESPACE: k8s-test
       # see https://github.com/kubernetes-sigs/kind/tags
       KIND_VERSION: v0.22.0
       # see https://hub.docker.com/r/kindest/node/tags for available versions!
       K8S_VERSION: v1.27.11
-      # https://github.com/operator-framework/operator-lifecycle-manager/releases
-      OLM_VERSION: v0.27.0
       NMO_VERSION: 0.18.0
       NMO_PREVIOUS_VERSION: 0.17.0
 
