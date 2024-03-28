@@ -407,6 +407,10 @@ catalog-push: ## Push a catalog image.
 
 ##@ Targets used by CI
 
+.PHONY: test-scorecard
+test-scorecard: operator-sdk ## Run Scorecard testing for the bundle directory on OPERATOR_NAMESPACE
+	$(OPERATOR_SDK) scorecard ./bundle -n $(OPERATOR_NAMESPACE)  
+
 .PHONY: check 
 check: ## Dockerized version of make test
 	$(DOCKER_GO) "make test"
