@@ -20,6 +20,12 @@ GO_VERSION = 1.20
 ENVTEST_K8S_VERSION = 1.28
 # See https://github.com/slintes/sort-imports/releases for the last version
 SORT_IMPORTS_VERSION = v0.2.1
+# OCP Version: for OKD bundle community
+OCP_VERSION ?= 4.12
+# update for major version updates to YQ_VERSION! see https://github.com/mikefarah/yq
+# NOTE: v4.42.1 is the latest supporting go 1.20
+YQ_API_VERSION = v4
+YQ_VERSION = v4.42.1
 
 # IMAGE_REGISTRY used to indicate the registery/group for the operator, bundle and catalog
 IMAGE_REGISTRY ?= quay.io/medik8s
@@ -212,18 +218,26 @@ export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
 export CSV ?= "./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
 
 .PHONY: bundle-update
-bundle-update: verify-previous-version ## Update CSV fields and validate the bundle directory
+bundle-update: ## Update CSV fields and validate the bundle directory
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
 	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ${CSV}
-	sed -r -i "s|replaces: .*|replaces: $(OPERATOR_NAME).v${PREVIOUS_VERSION}|;" ${CSV}
 	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
 	$(MAKE) bundle-validate
 
-.PHONY: verify-previous-version
-verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
-	@if [ $(VERSION) != $(DEFAULT_VERSION) ] && [ $(VERSION) != $(CI_VERSION) ] && [ $(PREVIOUS_VERSION) = $(DEFAULT_VERSION) ]; then \
-		echo "Error: PREVIOUS_VERSION must be set for the selected VERSION"; \
-    	exit 1; \
+.PHONY: add-replaces-field
+add-replaces-field: ## Add replaces field to the CSV
+	# add replaces field when building versioned bundle
+	@if [ $(VERSION) != $(DEFAULT_VERSION) ]; then \
+		if [ $(PREVIOUS_VERSION) == $(DEFAULT_VERSION) ]; then \
+			echo "Error: PREVIOUS_VERSION must be set for versioned builds"; \
+			exit 1; \
+		elif [ $(shell ./hack/semver_cmp.sh $(VERSION) $(PREVIOUS_VERSION)) != 1 ]; then \
+			echo "Error: VERSION ($(VERSION)) must be greater than PREVIOUS_VERSION ($(PREVIOUS_VERSION))"; \
+			exit 1; \
+		else \
+		  	# preferring sed here, in order to have "replaces" near "version" \
+			sed -r -i "/  version: $(VERSION)/ a\  replaces: $(OPERATOR_NAME).v$(PREVIOUS_VERSION)" ${CSV}; \
+		fi \
 	fi
 
 .PHONY: bundle-reset-date
@@ -231,9 +245,33 @@ bundle-reset-date: ## Reset bundle's createdAt
 	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ${CSV}
 
 .PHONY: bundle-community
-bundle-community: bundle-k8s ## Update displayName, and description fields in the bundle's CSV
+bundle-community: ## Update displayName, and description fields in the bundle's CSV
 	sed -r -i "s|displayName: Node Maintenance Operator|displayName: Node Maintenance Operator - Community Edition |;" ${CSV}
 	$(MAKE) bundle-update
+
+
+.PHONY: bundle-community-k8s
+bundle-community-k8s: bundle-k8s bundle-community ## Generate bundle manifests and metadata customized to Red Hat community release
+
+.PHONY: bundle-community-okd
+bundle-community-okd: bundle bundle-community  ## Generate bundle manifests and metadata customized to Red Hat community release
+	$(MAKE) add-replaces-field
+	$(MAKE) add-ocp-annotations
+	echo -e "\n  # Annotations for OCP\n  com.redhat.openshift.versions: \"v${OCP_VERSION}\"" >> bundle/metadata/annotations.yaml
+
+
+.PHONY: add-ocp-annotations
+add-ocp-annotations: yq ## Add OCP annotations
+	$(YQ) -i '.metadata.annotations."operators.openshift.io/valid-subscription" = "[\"OpenShift Kubernetes Engine\", \"OpenShift Container Platform\", \"OpenShift Platform Plus\"]"' ${CSV}
+	# new infrastructure annotations see https://docs.engineering.redhat.com/display/CFC/Best_Practices#Best_Practices-(New)RequiredInfrastructureAnnotations
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/disconnected" = "true"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/fips-compliant" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/proxy-aware" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/tls-profiles" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/token-auth-aws" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/token-auth-azure" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/token-auth-gcp" = "false"' ${CSV}
+
 
 ##@ Build
 
@@ -291,6 +329,7 @@ GINKGO_DIR ?= $(LOCALBIN)/ginkgo
 OPM_DIR = $(LOCALBIN)/opm
 OPERATOR_SDK_DIR ?= $(LOCALBIN)/operator-sdk
 SORT_IMPORTS_DIR ?= $(LOCALBIN)/sort-imports
+YQ_DIR ?= $(LOCALBIN)/yq
 
 ## Specific Tool Binaries
 KUSTOMIZE = $(KUSTOMIZE_DIR)/$(KUSTOMIZE_VERSION)/kustomize
@@ -301,6 +340,7 @@ GINKGO = $(GINKGO_DIR)/$(GINKGO_VERSION)/ginkgo
 OPM = $(OPM_DIR)/$(OPM_VERSION)/opm
 OPERATOR_SDK = $(OPERATOR_SDK_DIR)/$(OPERATOR_SDK_VERSION)/operator-sdk
 SORT_IMPORTS = $(SORT_IMPORTS_DIR)/$(SORT_IMPORTS_VERSION)/sort-imports
+YQ = $(YQ_DIR)/$(YQ_API_VERSION)-$(YQ_VERSION)/yq
 
 .PHONY: kustomize
 kustomize: ## Download kustomize locally if necessary.
@@ -325,6 +365,10 @@ ginkgo: ## Download ginkgo locally if necessary.
 .PHONY: sort-imports
 sort-imports: ## Download sort-imports locally if necessary.
 	$(call go-install-tool,$(SORT_IMPORTS),$(SORT_IMPORTS_DIR),github.com/slintes/sort-imports@$(SORT_IMPORTS_VERSION))
+
+.PHONY: yq
+yq: ## Download yq locally if necessary.
+	$(call go-install-tool,$(YQ),$(YQ_DIR), github.com/mikefarah/yq/$(YQ_API_VERSION)@$(YQ_VERSION))
 
 # go-install-tool will delete old package $2, then 'go install' any package $3 to $1.
 define go-install-tool
