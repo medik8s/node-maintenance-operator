@@ -209,14 +209,14 @@ bundle-cleanup: operator-sdk ## Remove bundle installed via bundle-run
 ## Some addition to bundle creation in the bundle
 DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ./config/assets/nmo_blue_icon.png)
 export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
-export BUNDLE_CSV ?= "./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
+export CSV ?= "./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
 
 .PHONY: bundle-update
 bundle-update: verify-previous-version ## Update CSV fields and validate the bundle directory
-	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${BUNDLE_CSV}
-	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ${BUNDLE_CSV}
-	sed -r -i "s|replaces: .*|replaces: $(OPERATOR_NAME).v${PREVIOUS_VERSION}|;" ${BUNDLE_CSV}
-	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${BUNDLE_CSV}
+	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
+	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ${CSV}
+	sed -r -i "s|replaces: .*|replaces: $(OPERATOR_NAME).v${PREVIOUS_VERSION}|;" ${CSV}
+	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
 	$(MAKE) bundle-validate
 
 .PHONY: verify-previous-version
@@ -228,11 +228,11 @@ verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
 
 .PHONY: bundle-reset-date
 bundle-reset-date: ## Reset bundle's createdAt
-	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ${BUNDLE_CSV}
+	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ${CSV}
 
 .PHONY: bundle-community
 bundle-community: bundle-k8s ## Update displayName, and description fields in the bundle's CSV
-	sed -r -i "s|displayName: Node Maintenance Operator|displayName: Node Maintenance Operator - Community Edition |;" ${BUNDLE_CSV}
+	sed -r -i "s|displayName: Node Maintenance Operator|displayName: Node Maintenance Operator - Community Edition |;" ${CSV}
 	$(MAKE) bundle-update
 
 ##@ Build
