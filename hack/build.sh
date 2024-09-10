@@ -9,7 +9,6 @@ BUILD_DATE=$(date --utc -Iseconds)
 mkdir -p bin
 
 LDFLAGS_VALUE="-X github.com/medik8s/node-maintenance-operator/version.Version=${VERSION} "
-# additional values must be quoted when used with GOFLAGS!
 LDFLAGS_VALUE+="-X github.com/medik8s/node-maintenance-operator/version.GitCommit=${COMMIT} "
 LDFLAGS_VALUE+="-X github.com/medik8s/node-maintenance-operator/version.BuildDate=${BUILD_DATE} "
 # allow override for debugging flags
@@ -27,8 +26,6 @@ export CGO_ENABLED=${CGO_ENABLED:-0}
 echo "cgo: ${CGO_ENABLED}"
 
 # export in case it was set
-if [ ! -z "${GOEXPERIMENT}" ]; then
-    export GOEXPERIMENT= $GOEXPERIMENT
-fi
+export GOEXPERIMENT= $GOEXPERIMENT
 
 GOOS=linux GOARCH=amd64 go build -o bin/manager main.go
