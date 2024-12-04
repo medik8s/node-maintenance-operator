@@ -1,11 +1,11 @@
 module github.com/medik8s/node-maintenance-operator
 
-go 1.20
+go 1.23
 
 require (
 	github.com/go-logr/logr v1.4.1
-	github.com/medik8s/common v1.15.1
-	github.com/onsi/ginkgo/v2 v2.14.0
+	github.com/medik8s/common v1.17.0
+	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.30.0
 	github.com/sirupsen/logrus v1.9.3
 	go.uber.org/zap v1.25.0
