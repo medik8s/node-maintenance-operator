@@ -15,13 +15,13 @@ OPM_VERSION ?= v1.35.0
 # See github.com/operator-framework/operator-sdk/releases for the last version
 OPERATOR_SDK_VERSION ?= v1.32.0
 # GO_VERSION refers to the version of Golang to be downloaded when running dockerized version
-GO_VERSION = 1.20
+GO_VERSION = 1.23
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28
 # See https://github.com/slintes/sort-imports/releases for the last version
 SORT_IMPORTS_VERSION = v0.2.1
 # OCP Version: for OKD bundle community
-OCP_VERSION ?= 4.12
+OCP_VERSION ?= 4.14
 # update for major version updates to YQ_VERSION! see https://github.com/mikefarah/yq
 # NOTE: v4.42.1 is the latest supporting go 1.20
 YQ_API_VERSION = v4
