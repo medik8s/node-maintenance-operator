@@ -283,6 +283,7 @@ spec:
                   capabilities:
                     drop:
                     - ALL
+                  readOnlyRootFilesystem: true
               priorityClassName: system-cluster-critical
               securityContext:
                 runAsNonRoot: true
