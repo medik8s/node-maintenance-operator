@@ -205,6 +205,7 @@ spec:
         serviceAccountName: node-maintenance-operator-controller-manager
       deployments:
       - label:
+          app.kubernetes.io/name: node-maintenance-operator
           control-plane: controller-manager
           node-maintenance-operator: ""
         name: node-maintenance-operator-controller-manager
@@ -212,6 +213,7 @@ spec:
           replicas: 1
           selector:
             matchLabels:
+              app.kubernetes.io/name: node-maintenance-operator
               control-plane: controller-manager
               node-maintenance-operator: ""
           strategy: {}
@@ -220,6 +222,7 @@ spec:
               annotations:
                 kubectl.kubernetes.io/default-container: manager
               labels:
+                app.kubernetes.io/name: node-maintenance-operator
                 control-plane: controller-manager
                 node-maintenance-operator: ""
             spec:
@@ -363,7 +366,6 @@ spec:
   provider:
     name: Medik8s
     url: https://github.com/medik8s
-  replaces: node-maintenance-operator.v0.0.1
   version: 0.0.1
   webhookdefinitions:
   - admissionReviewVersions:

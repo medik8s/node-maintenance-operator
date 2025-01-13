@@ -11,6 +11,7 @@ namePrefix: node-maintenance-operator-
 # Labels to add to all resources and selectors.
 commonLabels:
   node-maintenance-operator: ""
+  app.kubernetes.io/name: node-maintenance-operator
 
 bases:
 - ../crd

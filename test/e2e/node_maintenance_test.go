@@ -179,6 +179,9 @@ var _ = Describe("Starting Maintenance", func() {
 			// it should be caused by the test deployment's termination graceperiod > drain timeout
 			Expect(getOperatorLogs()).To(ContainSubstring(nodemaintenance.FixedDurationReconcileLog))
 
+			//validate that operator controller pod have app.kubernetes.io/name label
+			Expect(getOperatorLabel()).To(BeTrue(), "operator label validation failed")
+
 			By("node should be unschedulable and tainted node")
 			node := &corev1.Node{}
 			err = Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: maintenanceNodeName}, node)
@@ -417,6 +420,13 @@ func getOperatorPod() *corev1.Pod {
 	ExpectWithOffset(2, err).ToNot(HaveOccurred(), "failed to get operator pods")
 	ExpectWithOffset(2, len(pods.Items)).ToNot(BeZero(), "no operator pod found")
 	return &pods.Items[0]
+}
+
+func getOperatorLabel() bool {
+	pods, err := KubeClient.CoreV1().Pods(operatorNsName).List(context.Background(), metav1.ListOptions{LabelSelector: "app.kubernetes.io/name: node-maintenance-operator"})
+	ExpectWithOffset(2, err).ToNot(HaveOccurred(), "failed to get operator pods")
+	ExpectWithOffset(2, len(pods.Items)).ToNot(BeZero(), "no operator pod found")
+	return true
 }
 
 func isTainted(node *corev1.Node) bool {
