@@ -202,13 +202,13 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
-        serviceAccountName: node-maintenance-operator-controller-manager
+        serviceAccountName: node-maintenance-controller-manager
       deployments:
       - label:
           app.kubernetes.io/name: node-maintenance-operator
           control-plane: controller-manager
           node-maintenance-operator: ""
-        name: node-maintenance-operator-controller-manager
+        name: node-maintenance-controller-manager
         spec:
           replicas: 1
           selector:
@@ -290,7 +290,7 @@ spec:
               priorityClassName: system-cluster-critical
               securityContext:
                 runAsNonRoot: true
-              serviceAccountName: node-maintenance-operator-controller-manager
+              serviceAccountName: node-maintenance-controller-manager
               terminationGracePeriodSeconds: 10
               tolerations:
               - effect: NoSchedule
@@ -338,7 +338,7 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: node-maintenance-operator-controller-manager
+        serviceAccountName: node-maintenance-controller-manager
     strategy: deployment
   installModes:
   - supported: false
@@ -372,7 +372,7 @@ spec:
   - admissionReviewVersions:
     - v1
     containerPort: 443
-    deploymentName: node-maintenance-operator-controller-manager
+    deploymentName: node-maintenance-controller-manager
     failurePolicy: Fail
     generateName: vnodemaintenance.kb.io
     rules:
