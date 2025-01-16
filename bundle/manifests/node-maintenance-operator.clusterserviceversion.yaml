@@ -18,8 +18,8 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: ""
-    createdAt: ""
+    containerImage: quay.io/rh-ee-slevi/node-maintenance-operator:latest
+    createdAt: 2025-01-16 19:42:40
     description: Node Maintenance Operator for cordoning and draining nodes.
     olm.skipRange: '>=0.12.0'
     operatorframework.io/suggested-namespace: openshift-workload-availability
@@ -205,16 +205,16 @@ spec:
         serviceAccountName: node-maintenance-controller-manager
       deployments:
       - label:
+          app.kubernetes.io/component: controller-manager
           app.kubernetes.io/name: node-maintenance-operator
-          control-plane: controller-manager
           node-maintenance-operator: ""
         name: node-maintenance-controller-manager
         spec:
           replicas: 1
           selector:
             matchLabels:
+              app.kubernetes.io/component: controller-manager
               app.kubernetes.io/name: node-maintenance-operator
-              control-plane: controller-manager
               node-maintenance-operator: ""
           strategy: {}
           template:
@@ -222,8 +222,9 @@ spec:
               annotations:
                 kubectl.kubernetes.io/default-container: manager
               labels:
+                app.kubernetes.io/component: controller-manager
                 app.kubernetes.io/name: node-maintenance-operator
-                control-plane: controller-manager
+                kubectl.kubernetes.io/default-container: manager
                 node-maintenance-operator: ""
             spec:
               affinity:

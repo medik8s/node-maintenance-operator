@@ -423,7 +423,7 @@ func getOperatorPod() *corev1.Pod {
 }
 
 func getOperatorLabel() bool {
-	pods, err := KubeClient.CoreV1().Pods(operatorNsName).List(context.Background(), metav1.ListOptions{LabelSelector: "app.kubernetes.io/name: node-maintenance-operator"})
+	pods, err := KubeClient.CoreV1().Pods(operatorNsName).List(context.Background(), metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=node-maintenance-operator"})
 	ExpectWithOffset(2, err).ToNot(HaveOccurred(), "failed to get operator pods")
 	ExpectWithOffset(2, len(pods.Items)).ToNot(BeZero(), "no operator pod found")
 	return true
