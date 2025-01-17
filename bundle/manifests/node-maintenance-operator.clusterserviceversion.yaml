@@ -18,8 +18,8 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: quay.io/rh-ee-slevi/node-maintenance-operator:latest
-    createdAt: 2025-01-16 19:42:40
+    containerImage: ""
+    createdAt: ""
     description: Node Maintenance Operator for cordoning and draining nodes.
     olm.skipRange: '>=0.12.0'
     operatorframework.io/suggested-namespace: openshift-workload-availability
