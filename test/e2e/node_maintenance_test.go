@@ -180,9 +180,7 @@ var _ = Describe("Starting Maintenance", func() {
 			Expect(getOperatorLogs()).To(ContainSubstring(nodemaintenance.FixedDurationReconcileLog))
 
 			//validate that operator controller pod have app.kubernetes.io/name label
-			Expect(validateOperatorCustomLabelName()).To(BeTrue(), "operator label name validation failed")
-			Expect(validateOperatorCustomLabelComponent()).To(BeTrue(), "operator label component validation failed")
-			Expect(validateOperatorCustomLabelDefaultContainer()).To(BeTrue(), "operator label defaultContainer validation failed")
+			Expect(validateOperatorCustomLabels()).To(BeTrue(), "operator custom label validation failed")
 
 			By("node should be unschedulable and tainted node")
 			node := &corev1.Node{}
@@ -424,26 +422,31 @@ func getOperatorPod() *corev1.Pod {
 	return &pods.Items[0]
 }
 
-func validateOperatorCustomLabelName() bool {
-	pods, err := KubeClient.CoreV1().Pods(operatorNsName).List(context.Background(), metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=node-maintenance-operator"})
-	ExpectWithOffset(2, err).ToNot(HaveOccurred(), "failed to get operator pods by label name")
-	ExpectWithOffset(2, len(pods.Items)).ToNot(BeZero(), "no operator pod found")
+func validateOperatorCustomLabels() bool {
+
+	podOperator := getOperatorPod()
+	podName := podOperator.ObjectMeta.Name
+
+	// Get the Pod
+	pod, err := KubeClient.CoreV1().Pods(operatorNsName).Get(context.TODO(), podName, metav1.GetOptions{})
+	//pod, err := KubeClient.CoreV1().Pods(operatorNsName).List(context.Background(), metav1.ListOptions{LabelSelector: "app.kubernetes.io/name="})
+
+	ExpectWithOffset(1, err).ToNot(HaveOccurred(), fmt.Sprintf("Failed to get pod '%s'", podName))
+
+	// Labels to check for
+	requiredKeys := []string{"app.kubernetes.io/name",
+		"app.kubernetes.io/component",
+		"kubectl.kubernetes.io/default-container"}
+
+	// Check if each label is present
+	for _, key := range requiredKeys {
+		_, exists := pod.Labels[key]
+		ExpectWithOffset(1, exists).Should(BeTrue(), fmt.Sprintf("Missing required label '%s' in pod '%s'", key, podName))
+	}
+
 	return true
 }
 
-func validateOperatorCustomLabelComponent() bool {
-	pods, err := KubeClient.CoreV1().Pods(operatorNsName).List(context.Background(), metav1.ListOptions{LabelSelector: "app.kubernetes.io/component=controller-manager"})
-	ExpectWithOffset(2, err).ToNot(HaveOccurred(), "failed to get operator pods by label component")
-	ExpectWithOffset(2, len(pods.Items)).ToNot(BeZero(), "no operator pod found for app.kubernetes.io/component")
-	return true
-}
-
-func validateOperatorCustomLabelDefaultContainer() bool {
-	pods, err := KubeClient.CoreV1().Pods(operatorNsName).List(context.Background(), metav1.ListOptions{LabelSelector: "kubectl.kubernetes.io/default-container=manager"})
-	ExpectWithOffset(2, err).ToNot(HaveOccurred(), "failed to get operator pods by label default-container")
-	ExpectWithOffset(2, len(pods.Items)).ToNot(BeZero(), "no operator pod found for kubectl.kubernetes.io/default-container")
-	return true
-}
 func isTainted(node *corev1.Node) bool {
 	medik8sDrainTaint := corev1.Taint{
 		Key:    "medik8s.io/drain",
