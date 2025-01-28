@@ -202,7 +202,7 @@ bundle-run: operator-sdk ## Run bundle image. Default NS is "openshift-workload-
 	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) run bundle $(BUNDLE_IMG)
 
 .PHONY: bundle-run-update
-bundle-run-update: operator-sdk ## Update bundle image. 
+bundle-run-update: operator-sdk ## Update bundle image.
 # An older bundle image CSV should exist in the cluster, and in the same namespace,
 # Default NS is "openshift-workload-availability", redefine OPERATOR_NAMESPACE to override it.
 	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) run bundle-upgrade $(BUNDLE_IMG)
@@ -347,7 +347,7 @@ kustomize: ## Download kustomize locally if necessary.
 	$(call go-install-tool,$(KUSTOMIZE),$(KUSTOMIZE_DIR),sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_VERSION))
 
 .PHONY: controller-gen
-controller-gen: ## Download controller-gen locally if necessary.	
+controller-gen: ## Download controller-gen locally if necessary.
 	$(call go-install-tool,$(CONTROLLER_GEN),$(CONTROLLER_GEN_DIR),sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION})
 
 .PHONY: envtest
@@ -397,7 +397,7 @@ bundle: manifests operator-sdk kustomize ## Generate bundle manifests and metada
 bundle-k8s: bundle # Generate bundle manifests and metadata for Kubernetes, then validate generated files.
 	$(KUSTOMIZE) build config/manifests-k8s | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(MAKE) bundle-validate
-	
+
 .PHONY: bundle-validate
 bundle-validate: operator-sdk ## Validate the bundle directory with additional validators (suite=operatorframework), such as Kubernetes deprecated APIs (https://kubernetes.io/docs/reference/using-api/deprecation-guide/) based on bundle.CSV.Spec.MinKubeVersion
 	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
@@ -430,9 +430,21 @@ define url-install-tool
 	}
 endef
 
-ifneq ($(origin CATALOG_BASE_IMG), undefined)
-FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
-endif
+# Build a file-based catalog image
+# https://docs.openshift.com/container-platform/4.14/operators/admin/olm-managing-custom-catalogs.html#olm-managing-custom-catalogs-fb
+# NOTE: CATALOG_DIR and CATALOG_DOCKERFILE items won't be deleted in case of recipe's failure
+CATALOG_DIR := catalog
+CATALOG_DOCKERFILE := ${CATALOG_DIR}.Dockerfile
+CATALOG_INDEX := $(CATALOG_DIR)/index.yaml
+
+.PHONY: add_channel_entry_for_the_bundle
+add_channel_entry_for_the_bundle:
+	@echo "---" >> ${CATALOG_INDEX}
+	@echo "schema: olm.channel" >> ${CATALOG_INDEX}
+	@echo "package: ${OPERATOR_NAME}" >> ${CATALOG_INDEX}
+	@echo "name: ${CHANNELS}" >> ${CATALOG_INDEX}
+	@echo "entries:" >> ${CATALOG_INDEX}
+	@echo "  - name: ${OPERATOR_NAME}.v${VERSION}" >> ${CATALOG_INDEX}
 
 .PHONY: build-tools
 build-tools: ## Download & build all the tools locally if necessary.
@@ -442,8 +454,23 @@ build-tools: ## Download & build all the tools locally if necessary.
 # This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
 # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
 .PHONY: catalog-build
-catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMG) $(FROM_INDEX_OPT)
+catalog-build: opm ## Build a file-based catalog image.
+	# Remove the catalog directory and Dockerfile
+	-rm -r ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
+	@mkdir -p ${CATALOG_DIR}
+	$(OPM) generate dockerfile ${CATALOG_DIR}
+	$(OPM) init ${OPERATOR_NAME} \
+		--default-channel=${CHANNELS} \
+		--description=./README.md \
+		--icon=${BLUE_ICON_PATH} \
+		--output yaml \
+		> ${CATALOG_INDEX}
+	$(OPM) render ${BUNDLE_IMG} --output yaml >> ${CATALOG_INDEX}
+	$(MAKE) add_channel_entry_for_the_bundle
+	$(OPM) validate ${CATALOG_DIR}
+	docker build . -f ${CATALOG_DOCKERFILE} -t ${CATALOG_IMG}
+	# Clean up the catalog directory and Dockerfile
+	rm -r ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
 
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
@@ -453,9 +480,9 @@ catalog-push: ## Push a catalog image.
 
 .PHONY: test-scorecard
 test-scorecard: operator-sdk ## Run Scorecard testing for the bundle directory on OPERATOR_NAMESPACE
-	$(OPERATOR_SDK) scorecard ./bundle -n $(OPERATOR_NAMESPACE)  
+	$(OPERATOR_SDK) scorecard ./bundle -n $(OPERATOR_NAMESPACE)
 
-.PHONY: check 
+.PHONY: check
 check: ## Dockerized version of make test
 	$(DOCKER_GO) "make test"
 
@@ -463,7 +490,7 @@ check: ## Dockerized version of make test
 verify-unchanged: ## Verify there are no un-committed changes
 	./hack/verify-unchanged.sh
 
-.PHONY: container-build 
+.PHONY: container-build
 container-build: check ## Build containers
 	$(DOCKER_GO) "make bundle"
 	make docker-build bundle-build
@@ -475,12 +502,12 @@ bundle-build-community: bundle-community ## Run bundle community changes in CSV,
 .PHONY: container-build-community
 container-build-community: docker-build bundle-build-community ## Build containers for community
 
-.PHONY: container-push 
+.PHONY: container-push
 container-push: docker-push bundle-push catalog-build catalog-push## Push containers (NOTE: catalog can't be build before bundle was pushed)
 
 .PHONY: container-build-and-push-community
 container-build-and-push-community: container-build-community container-push ## Build four images, update CSV for community, and push all the images to Quay (docker, bundle, and catalog).
 
-.PHONY: cluster-functest 
+.PHONY: cluster-functest
 cluster-functest: ginkgo ## Run e2e tests in a real cluster
 	./hack/functest.sh $(GINKGO_VERSION)
