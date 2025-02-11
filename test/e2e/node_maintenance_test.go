@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nmo "github.com/medik8s/node-maintenance-operator/api/v1beta1"
@@ -223,7 +223,6 @@ var _ = Describe("Starting Maintenance", func() {
 			waitForTestDeployment(1)
 
 		})
-
 	})
 })
 
@@ -253,14 +252,14 @@ func getNodes() ([]string, []string) {
 	return controlPlaneNodes, workers
 }
 
-func getNodeMaintenance(objectname, nodeName string) *nmo.NodeMaintenance {
+func getNodeMaintenance(name, nodeName string) *nmo.NodeMaintenance {
 	return &nmo.NodeMaintenance{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       maintenanceKind,
 			APIVersion: "nodemaintenance.medik8s.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: objectname,
+			Name: name,
 		},
 		Spec: nmo.NodeMaintenanceSpec{
 			NodeName: nodeName,
@@ -301,7 +300,7 @@ func createTestDeployment() {
 			Namespace: testNsName,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: pointer.Int32Ptr(1),
+			Replicas: ptr.To[int32](1),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: podLabel,
 			},
@@ -342,7 +341,7 @@ func createTestDeployment() {
 						Args:    []string{"-c", "while true; do echo hello; sleep 10;done"},
 					}},
 					// make sure we run into the drain timeout at least once
-					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(nodemaintenance.DrainerTimeout.Seconds()) + 50),
+					TerminationGracePeriodSeconds: ptr.To[int64](int64(nodemaintenance.DrainerTimeout.Seconds()) + 50),
 				},
 			},
 		},
