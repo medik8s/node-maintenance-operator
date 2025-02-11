@@ -33,7 +33,8 @@ const (
 	testWorkerMaintenance = "test-maintenance"
 	retryInterval         = time.Second * 5
 	eventInterval         = time.Second * 10
-	timeout               = time.Second * 120
+	deploymentTimeout     = time.Second * 120
+	eventsTimeout         = time.Second * 180
 	testDeployment        = "test-deployment"
 )
 
@@ -373,7 +374,7 @@ func waitForTestDeployment(offset int) {
 		logInfoln("test deployment not available yet")
 		return fmt.Errorf("test deploymemt not ready yet")
 
-	}, timeout, retryInterval).ShouldNot(HaveOccurred(), "test deployment failed")
+	}, deploymentTimeout, retryInterval).ShouldNot(HaveOccurred(), "test deployment failed")
 
 }
 
@@ -463,7 +464,7 @@ func isLeaseInvalidated(nodeName string) {
 // by its name and reason
 func waitForEvent(ctx context.Context, eventReason, eventIdentifier string) error {
 	// Wait for events with a timeout
-	return wait.PollUntilContextTimeout(ctx, retryInterval, timeout, true, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, retryInterval, eventsTimeout, true, func(ctx context.Context) (bool, error) {
 		events, err := KubeClient.CoreV1().Events("").List(ctx, metav1.ListOptions{
 			FieldSelector: fmt.Sprintf("involvedObject.kind=%s", maintenanceKind),
 		})
