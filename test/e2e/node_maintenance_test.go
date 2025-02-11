@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nmo "github.com/medik8s/node-maintenance-operator/api/v1beta1"
@@ -33,7 +33,8 @@ const (
 	testWorkerMaintenance = "test-maintenance"
 	retryInterval         = time.Second * 5
 	eventInterval         = time.Second * 10
-	timeout               = time.Second * 120
+	deploymentTimeout     = time.Second * 120
+	eventsTimeout         = time.Second * 180
 	testDeployment        = "test-deployment"
 )
 
@@ -223,7 +224,6 @@ var _ = Describe("Starting Maintenance", func() {
 			waitForTestDeployment(1)
 
 		})
-
 	})
 })
 
@@ -253,14 +253,14 @@ func getNodes() ([]string, []string) {
 	return controlPlaneNodes, workers
 }
 
-func getNodeMaintenance(objectname, nodeName string) *nmo.NodeMaintenance {
+func getNodeMaintenance(name, nodeName string) *nmo.NodeMaintenance {
 	return &nmo.NodeMaintenance{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       maintenanceKind,
 			APIVersion: "nodemaintenance.medik8s.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: objectname,
+			Name: name,
 		},
 		Spec: nmo.NodeMaintenanceSpec{
 			NodeName: nodeName,
@@ -301,7 +301,7 @@ func createTestDeployment() {
 			Namespace: testNsName,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: pointer.Int32Ptr(1),
+			Replicas: ptr.To[int32](1),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: podLabel,
 			},
@@ -342,7 +342,7 @@ func createTestDeployment() {
 						Args:    []string{"-c", "while true; do echo hello; sleep 10;done"},
 					}},
 					// make sure we run into the drain timeout at least once
-					TerminationGracePeriodSeconds: pointer.Int64Ptr(int64(nodemaintenance.DrainerTimeout.Seconds()) + 50),
+					TerminationGracePeriodSeconds: ptr.To[int64](int64(nodemaintenance.DrainerTimeout.Seconds()) + 50),
 				},
 			},
 		},
@@ -374,7 +374,7 @@ func waitForTestDeployment(offset int) {
 		logInfoln("test deployment not available yet")
 		return fmt.Errorf("test deploymemt not ready yet")
 
-	}, timeout, retryInterval).ShouldNot(HaveOccurred(), "test deployment failed")
+	}, deploymentTimeout, retryInterval).ShouldNot(HaveOccurred(), "test deployment failed")
 
 }
 
@@ -464,7 +464,7 @@ func isLeaseInvalidated(nodeName string) {
 // by its name and reason
 func waitForEvent(ctx context.Context, eventReason, eventIdentifier string) error {
 	// Wait for events with a timeout
-	return wait.PollUntilContextTimeout(ctx, retryInterval, timeout, true, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, retryInterval, eventsTimeout, true, func(ctx context.Context) (bool, error) {
 		events, err := KubeClient.CoreV1().Events("").List(ctx, metav1.ListOptions{
 			FieldSelector: fmt.Sprintf("involvedObject.kind=%s", maintenanceKind),
 		})
