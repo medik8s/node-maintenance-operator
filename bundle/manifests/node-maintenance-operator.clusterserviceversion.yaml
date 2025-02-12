@@ -202,17 +202,19 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
-        serviceAccountName: node-maintenance-operator-controller-manager
+        serviceAccountName: node-maintenance-controller-manager
       deployments:
       - label:
-          control-plane: controller-manager
+          app.kubernetes.io/component: controller-manager
+          app.kubernetes.io/name: node-maintenance-operator
           node-maintenance-operator: ""
-        name: node-maintenance-operator-controller-manager
+        name: node-maintenance-controller-manager
         spec:
           replicas: 1
           selector:
             matchLabels:
-              control-plane: controller-manager
+              app.kubernetes.io/component: controller-manager
+              app.kubernetes.io/name: node-maintenance-operator
               node-maintenance-operator: ""
           strategy: {}
           template:
@@ -220,7 +222,9 @@ spec:
               annotations:
                 kubectl.kubernetes.io/default-container: manager
               labels:
-                control-plane: controller-manager
+                app.kubernetes.io/component: controller-manager
+                app.kubernetes.io/name: node-maintenance-operator
+                kubectl.kubernetes.io/default-container: manager
                 node-maintenance-operator: ""
             spec:
               affinity:
@@ -287,7 +291,7 @@ spec:
               priorityClassName: system-cluster-critical
               securityContext:
                 runAsNonRoot: true
-              serviceAccountName: node-maintenance-operator-controller-manager
+              serviceAccountName: node-maintenance-controller-manager
               terminationGracePeriodSeconds: 10
               tolerations:
               - effect: NoSchedule
@@ -335,7 +339,7 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: node-maintenance-operator-controller-manager
+        serviceAccountName: node-maintenance-controller-manager
     strategy: deployment
   installModes:
   - supported: false
@@ -369,7 +373,7 @@ spec:
   - admissionReviewVersions:
     - v1
     containerPort: 443
-    deploymentName: node-maintenance-operator-controller-manager
+    deploymentName: node-maintenance-controller-manager
     failurePolicy: Fail
     generateName: vnodemaintenance.kb.io
     rules:

@@ -180,6 +180,9 @@ var _ = Describe("Starting Maintenance", func() {
 			// it should be caused by the test deployment's termination graceperiod > drain timeout
 			Expect(getOperatorLogs()).To(ContainSubstring(nodemaintenance.FixedDurationReconcileLog))
 
+			//validate that operator controller pod have app.kubernetes.io/name label
+			Expect(validateOperatorCustomLabels()).To(BeTrue(), "operator custom label validation failed")
+
 			By("node should be unschedulable and tainted node")
 			node := &corev1.Node{}
 			err = Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: maintenanceNodeName}, node)
@@ -417,6 +420,31 @@ func getOperatorPod() *corev1.Pod {
 	ExpectWithOffset(2, err).ToNot(HaveOccurred(), "failed to get operator pods")
 	ExpectWithOffset(2, len(pods.Items)).ToNot(BeZero(), "no operator pod found")
 	return &pods.Items[0]
+}
+
+func validateOperatorCustomLabels() bool {
+
+	podOperator := getOperatorPod()
+	podName := podOperator.ObjectMeta.Name
+
+	// Get the Pod
+	pod, err := KubeClient.CoreV1().Pods(operatorNsName).Get(context.TODO(), podName, metav1.GetOptions{})
+	//pod, err := KubeClient.CoreV1().Pods(operatorNsName).List(context.Background(), metav1.ListOptions{LabelSelector: "app.kubernetes.io/name="})
+
+	ExpectWithOffset(1, err).ToNot(HaveOccurred(), fmt.Sprintf("Failed to get pod '%s'", podName))
+
+	// Labels to check for
+	requiredKeys := []string{"app.kubernetes.io/name",
+		"app.kubernetes.io/component",
+		"kubectl.kubernetes.io/default-container"}
+
+	// Check if each label is present
+	for _, key := range requiredKeys {
+		_, exists := pod.Labels[key]
+		ExpectWithOffset(1, exists).Should(BeTrue(), fmt.Sprintf("Missing required label '%s' in pod '%s'", key, podName))
+	}
+
+	return true
 }
 
 func isTainted(node *corev1.Node) bool {

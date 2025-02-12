@@ -3,8 +3,9 @@ kind: ClusterRole
 metadata:
   creationTimestamp: null
   labels:
+    app.kubernetes.io/name: node-maintenance-operator
     node-maintenance-operator: ""
-  name: node-maintenance-operator-metrics-reader
+  name: node-maintenance-metrics-reader
 rules:
 - nonResourceURLs:
   - /metrics

@@ -6,11 +6,13 @@ namespace: node-maintenance-operator-system
 # "wordpress" becomes "alices-wordpress".
 # Note that it should also match with the prefix (text before '-') of the namespace
 # field above.
-namePrefix: node-maintenance-operator-
+namePrefix: node-maintenance-
 
 # Labels to add to all resources and selectors.
+# Workaround: rename the deployment (by modifying namePrefix above)
 commonLabels:
   node-maintenance-operator: ""
+  app.kubernetes.io/name: node-maintenance-operator
 
 bases:
 - ../crd

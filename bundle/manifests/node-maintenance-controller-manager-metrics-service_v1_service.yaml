@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app.kubernetes.io/component: controller-manager
+    app.kubernetes.io/name: node-maintenance-operator
+    node-maintenance-operator: ""
+  name: node-maintenance-controller-manager-metrics-service
+spec:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: https
+  selector:
+    app.kubernetes.io/component: controller-manager
+    app.kubernetes.io/name: node-maintenance-operator
+    node-maintenance-operator: ""
+status:
+  loadBalancer: {}
