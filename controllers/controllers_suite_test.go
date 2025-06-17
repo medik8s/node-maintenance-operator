@@ -91,12 +91,13 @@ var _ = BeforeSuite(func() {
 	fakeRecorder = record.NewFakeRecorder(20)
 	// Create a ReconcileNodeMaintenance object with the scheme and fake client
 	r = &NodeMaintenanceReconciler{
-		Client:       k8sClient,
-		Scheme:       scheme.Scheme,
-		MgrConfig:    cfg,
-		LeaseManager: &mockLeaseManager{mockManager},
-		Recorder:     fakeRecorder,
-		logger:       ctrl.Log.WithName("unit test"),
+		Client:                  k8sClient,
+		Scheme:                  scheme.Scheme,
+		MgrConfig:               cfg,
+		LeaseManager:            &mockLeaseManager{mockManager},
+		Recorder:                fakeRecorder,
+		logger:                  ctrl.Log.WithName("unit test"),
+		MaxConcurrentReconciles: 1,
 	}
 	ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
 	drainer, err = createDrainer(ctx, cfg)

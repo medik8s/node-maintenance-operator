@@ -24,6 +24,7 @@ import (
 	"github.com/go-logr/logr"
 	commonLabels "github.com/medik8s/common/pkg/labels"
 	"github.com/medik8s/common/pkg/lease"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	corev1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -67,11 +68,16 @@ type NodeMaintenanceReconciler struct {
 	LeaseManager lease.Manager
 	Recorder     record.EventRecorder
 	logger       logr.Logger
+
+	MaxConcurrentReconciles int
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeMaintenanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: r.MaxConcurrentReconciles,
+		}).
 		For(&v1beta1.NodeMaintenance{}).
 		Complete(r)
 }
