@@ -54,9 +54,9 @@ const (
 	expectedNodeNotFoundErrorMsg = "nodes \"%s\" not found"
 
 	//lease consts
-	LeaseHolderIdentity = "node-maintenance"
-	LeaseDuration       = 3600 * time.Second
-	DrainerTimeout      = 30 * time.Second
+	LeaseHolderIdentity   = "node-maintenance"
+	LeaseDuration         = 3600 * time.Second
+	DefaultDrainerTimeout = 30 * time.Second
 )
 
 // NodeMaintenanceReconciler reconciles a NodeMaintenance object
@@ -67,6 +67,8 @@ type NodeMaintenanceReconciler struct {
 	LeaseManager lease.Manager
 	Recorder     record.EventRecorder
 	logger       logr.Logger
+
+	DrainerTimeout time.Duration
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -121,7 +123,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		r.logger.Info("Error reading the request object, requeuing.")
 		return emptyResult, err
 	}
-	drainer, err := createDrainer(ctx, r.MgrConfig)
+	drainer, err := createDrainer(ctx, r.MgrConfig, r.DrainerTimeout)
 	if err != nil {
 		return emptyResult, err
 	}
@@ -257,7 +259,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 // createDrainer creates a drain.Helper struct for external cordon and drain API
-func createDrainer(ctx context.Context, mgrConfig *rest.Config) (*drain.Helper, error) {
+func createDrainer(ctx context.Context, mgrConfig *rest.Config, timeout time.Duration) (*drain.Helper, error) {
 	drainer := &drain.Helper{}
 
 	//Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.
@@ -284,7 +286,7 @@ func createDrainer(ctx context.Context, mgrConfig *rest.Config) (*drain.Helper, 
 
 	// TODO - add logical value or attach from the maintenance CR
 	//The length of time to wait before giving up, zero means infinite
-	drainer.Timeout = DrainerTimeout
+	drainer.Timeout = timeout
 
 	cs, err := kubernetes.NewForConfig(mgrConfig)
 	if err != nil {

@@ -342,7 +342,7 @@ func createTestDeployment() {
 						Args:    []string{"-c", "while true; do echo hello; sleep 10;done"},
 					}},
 					// make sure we run into the drain timeout at least once
-					TerminationGracePeriodSeconds: ptr.To[int64](int64(nodemaintenance.DrainerTimeout.Seconds()) + 50),
+					TerminationGracePeriodSeconds: ptr.To[int64](int64(nodemaintenance.DefaultDrainerTimeout.Seconds()) + 50),
 				},
 			},
 		},
