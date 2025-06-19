@@ -83,6 +83,12 @@ func main() {
 	flag.BoolVar(&enableHTTP2, "enable-http2", false, "If HTTP/2 should be enabled for the metrics and webhook servers.")
 	flag.DurationVar(&drainerTimeout, "drainer-timeout", controllers.DefaultDrainerTimeout, "Timeout for draining a node.")
 
+	if drainerTimeout <= 0 {
+		setupLog.Error(fmt.Errorf("got non positive DrainerTimeout='%s'", drainerTimeout), "Invalid DrainerTimout")
+		os.Exit(1)
+	}
+	setupLog.Info(fmt.Sprintf("Using drainer timeout: %s", drainerTimeout))
+
 	opts := zap.Options{
 		Development: true,
 		TimeEncoder: zapcore.RFC3339NanoTimeEncoder,

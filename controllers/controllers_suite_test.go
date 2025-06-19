@@ -100,7 +100,7 @@ var _ = BeforeSuite(func() {
 		DrainerTimeout: DefaultDrainerTimeout,
 	}
 	ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
-	drainer, err = createDrainer(ctx, cfg)
+	drainer, err = createDrainer(ctx, cfg, r.DrainerTimeout)
 	Expect(err).NotTo(HaveOccurred())
 	// in test pods are not evicted, so don't wait forever for them
 	drainer.SkipWaitForDeleteTimeoutSeconds = 0
