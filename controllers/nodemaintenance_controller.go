@@ -126,7 +126,10 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return emptyResult, err
 	}
 
-	if !controllerutil.ContainsFinalizer(nm, v1beta1.NodeMaintenanceFinalizer) && nm.ObjectMeta.DeletionTimestamp.IsZero() {
+	if !controllerutil.ContainsFinalizer(nm, v1beta1.NodeMaintenanceFinalizer) && !nm.ObjectMeta.DeletionTimestamp.IsZero() {
+		r.logger.Info(fmt.Sprintf("NodeMaintenance is in deletion process. %s finalizer is not present. Skip reconcile", v1beta1.NodeMaintenanceFinalizer))
+		return emptyResult, nil
+	} else if !controllerutil.ContainsFinalizer(nm, v1beta1.NodeMaintenanceFinalizer) && nm.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Add finalizer when object is created
 		controllerutil.AddFinalizer(nm, v1beta1.NodeMaintenanceFinalizer)
 		if err := r.Client.Update(ctx, nm); err != nil {
