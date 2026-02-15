@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -340,11 +341,16 @@ func (r *NodeMaintenanceReconciler) obtainLease(ctx context.Context, node *corev
 	err := r.LeaseManager.RequestLease(ctx, node, LeaseDuration)
 
 	if err != nil {
+		var alreadyHeldErr lease.AlreadyHeldError
+		if errors.As(err, &alreadyHeldErr) {
+			// We don't own the lease and it could be NHC
+			return true, err
+		}
 		r.logger.Error(err, "failed to create or get existing lease")
 		return false, err
 	}
 
-	return false, nil
+	return true, nil
 }
 
 func addExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client.Client, log logr.Logger) error {
