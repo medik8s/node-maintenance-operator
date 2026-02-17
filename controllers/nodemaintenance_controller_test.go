@@ -315,7 +315,10 @@ var _ = Describe("Node Maintenance", func() {
 			})
 			It("should wait for lease to be released and succeed maintenance after lease is released", func() {
 				By("Waiting for NMO to fail from lease contention, then recover after lease is released")
-				verifyEvent(corev1.EventTypeWarning, utils.EventReasonFailedMaintenance, utils.EventMessageFailedMaintenance)
+				Eventually(func() error {
+					verifyEvent(corev1.EventTypeWarning, utils.EventReasonFailedMaintenance, utils.EventMessageFailedMaintenance)
+					return nil
+				}, "5s", "200ms").Should(Succeed())
 
 				maintenance := &v1beta1.NodeMaintenance{}
 				Eventually(func(g Gomega) {

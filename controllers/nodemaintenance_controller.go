@@ -404,7 +404,12 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Co
 		// if CR is gathered as result of garbage collection: the node may have been deleted, but the CR has not yet been deleted, still we must clean up the lease!
 		if apiErrors.IsNotFound(err) {
 			if err := r.LeaseManager.InvalidateLease(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}); err != nil {
-				return err
+				var alreadyHeldErr lease.AlreadyHeldError
+				if errors.As(err, &alreadyHeldErr) {
+					r.logger.Info("lease is held by another entity, skipping invalidation during deletion cleanup", "error", err)
+				} else {
+					return err
+				}
 			}
 			return nil
 		}
