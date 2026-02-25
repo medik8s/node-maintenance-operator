@@ -214,20 +214,19 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				// if we are already in the middle of draining, and we failed to extend a lease that used to be owned by us
 				// then we need to increment the error on lease count and return an error
 				nm.Status.ErrorOnLeaseCount += 1
-				return r.onReconcileError(ctx, nm, drainer, fmt.Errorf("failed to extend a lease that used to be owned by us, due toncrementing error on lease count : %v, new errorOnLeaseCount: %d", err, nm.Status.ErrorOnLeaseCount))
+				return r.onReconcileError(ctx, nm, drainer, fmt.Errorf("failed to extend a lease that used to be owned by us, incrementing error on lease count: %v, errorOnLeaseCount: %d", err, nm.Status.ErrorOnLeaseCount))
 			}
 			return r.onReconcileError(ctx, nm, drainer, fmt.Errorf("failed to obtain a lease that is not owned by us : %v errorOnLeaseCount %d", err, nm.Status.ErrorOnLeaseCount))
 		}
 		r.logger.Error(err, "failed to request lease, and incrementing error on lease count", "errorOnLeaseCount", nm.Status.ErrorOnLeaseCount)
 		nm.Status.ErrorOnLeaseCount += 1
 		return r.onReconcileError(ctx, nm, drainer, err)
-	} else {
-		r.logger.Info("lease obtained successfully")
-		if nm.Status.Phase != v1beta1.MaintenanceRunning || nm.Status.ErrorOnLeaseCount != 0 {
-			nm.Status.Phase = v1beta1.MaintenanceRunning
-			// Another chance to evict pods - clear ErrorOnLeaseCount and try again to put the node under maintenance
-			nm.Status.ErrorOnLeaseCount = 0
-		}
+	}
+	r.logger.Info("lease obtained successfully")
+	if nm.Status.Phase != v1beta1.MaintenanceRunning || nm.Status.ErrorOnLeaseCount != 0 {
+		nm.Status.Phase = v1beta1.MaintenanceRunning
+		// Another chance to evict pods - clear ErrorOnLeaseCount and try again to put the node under maintenance
+		nm.Status.ErrorOnLeaseCount = 0
 	}
 
 	if err := addExcludeRemediationLabel(ctx, node, r.Client, r.logger); err != nil {
