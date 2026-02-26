@@ -29,6 +29,9 @@ const (
 	dummyLabelKey   = "dummyLabel"
 	dummyLabelValue = "true"
 	testNamespace   = "test-namespace"
+
+	defaultTimeout  = 2 * time.Second
+	defaultInterval = 500 * time.Millisecond
 )
 
 var testLog = ctrl.Log.WithName("nmo-controllers-unit-test")
@@ -260,6 +263,165 @@ var _ = Describe("Node Maintenance", func() {
 				verifyNoEvent(corev1.EventTypeNormal, utils.EventReasonSucceedMaintenance, utils.EventMessageSucceedMaintenance)
 			})
 		})
+		When("lease is already held by another entity", func() {
+			BeforeEach(func() {
+				originalLeaseManager := r.LeaseManager
+				r.LeaseManager = &mockLeaseManager{
+					Manager:         originalLeaseManager.(*mockLeaseManager).Manager,
+					requestLeaseErr: lease.AlreadyHeldError{},
+				}
+				DeferCleanup(func() {
+					r.LeaseManager = originalLeaseManager
+				})
+
+				nm = getTestNM("node-maintenance-lease-held", taintedNodeName)
+				Expect(k8sClient.Create(ctx, nm)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, ctx, nm)
+			})
+			It("should retry without incrementing ErrorOnLeaseCount when DrainProgress is 0", func() {
+				By("Waiting for the reconciler to attempt lease acquisition and report the error")
+				maintenance := &v1beta1.NodeMaintenance{}
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
+					g.Expect(maintenance.Status.LastError).To(ContainSubstring("failed to obtain a lease that is not owned by us"))
+				}, defaultTimeout, defaultInterval).Should(Succeed())
+
+				By("Verifying ErrorOnLeaseCount stays at 0 since DrainProgress is 0")
+				Expect(maintenance.Status.ErrorOnLeaseCount).To(Equal(0))
+				Expect(maintenance.Status.DrainProgress).To(Equal(0))
+
+				By("Verifying maintenance stays in Running phase, not Failed")
+				Expect(maintenance.Status.Phase).To(Equal(v1beta1.MaintenanceRunning))
+				verifyNoEvent(corev1.EventTypeWarning, utils.EventReasonFailedMaintenance, utils.EventMessageFailedMaintenance)
+			})
+		})
+		When("lease is held then released by another entity", func() {
+			BeforeEach(func() {
+				originalLeaseManager := r.LeaseManager
+				// The mock returns AlreadyHeldError for exactly (maxAllowedErrorToUpdateOwnedLease + 2)
+				// RequestLease calls, then returns nil — simulating NHC releasing the lease.
+				// Since DrainProgress=0 throughout the failure period, ErrorOnLeaseCount is never
+				// incremented and no FailedMaintenance event is emitted.
+				r.LeaseManager = &mockLeaseManager{
+					Manager:            originalLeaseManager.(*mockLeaseManager).Manager,
+					requestLeaseErr:    lease.AlreadyHeldError{},
+					maxRequestFailures: maxAllowedErrorToUpdateOwnedLease + 2,
+				}
+				DeferCleanup(func() {
+					r.LeaseManager = originalLeaseManager
+				})
+
+				nm = getTestNM("node-maintenance-lease-released", taintedNodeName)
+				Expect(k8sClient.Create(ctx, nm)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, ctx, nm)
+			})
+			It("should succeed maintenance directly after lease is released without entering Failed state", func() {
+				By("Confirming the lease was held by another entity")
+				maintenance := &v1beta1.NodeMaintenance{}
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
+					g.Expect(maintenance.Status.LastError).To(ContainSubstring("failed to obtain a lease that is not owned by us"))
+				}, defaultTimeout, defaultInterval).Should(Succeed())
+
+				By("Waiting for NMO to acquire the lease and complete maintenance")
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
+					g.Expect(maintenance.Status.Phase).To(Equal(v1beta1.MaintenanceSucceeded))
+					g.Expect(maintenance.Status.ErrorOnLeaseCount).To(Equal(0))
+					g.Expect(maintenance.Status.DrainProgress).To(Equal(100))
+				}, defaultTimeout, defaultInterval).Should(Succeed())
+
+				By("Verifying node was cordoned with proper taints")
+				node := &corev1.Node{}
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: taintedNodeName}, node)).To(Succeed())
+				Expect(node.Spec.Unschedulable).To(BeTrue())
+				Expect(isTaintExist(node, medik8sDrainTaint.Key, corev1.TaintEffectNoSchedule)).To(BeTrue())
+				Expect(isTaintExist(node, nodeUnschedulableTaint.Key, corev1.TaintEffectNoSchedule)).To(BeTrue())
+
+				verifyNoEvent(corev1.EventTypeWarning, utils.EventReasonFailedMaintenance, utils.EventMessageFailedMaintenance)
+				verifyEvent(corev1.EventTypeNormal, utils.EventReasonSucceedMaintenance, utils.EventMessageSucceedMaintenance)
+			})
+		})
+		When("lease is transiently lost during maintenance", func() {
+			BeforeEach(func() {
+				originalLeaseManager := r.LeaseManager
+				// First RequestLease succeeds (NMO starts maintenance), then 2 calls
+				// fail with AlreadyHeldError (another entity temporarily takes the
+				// lease), then succeed again (lease released back to NMO).
+				// 2 failures < threshold of 4, so NMO suspends, then resumes
+				// maintenance and eventually succeeds.
+				r.LeaseManager = &mockLeaseManager{
+					Manager:            originalLeaseManager.(*mockLeaseManager).Manager,
+					requestLeaseErr:    lease.AlreadyHeldError{},
+					failAfterSuccesses: 1,
+					maxRequestFailures: 2,
+				}
+				DeferCleanup(func() {
+					r.LeaseManager = originalLeaseManager
+				})
+
+				nm = getTestNM("node-maintenance-lease-recovered", taintedNodeName)
+				Expect(k8sClient.Create(ctx, nm)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, ctx, nm)
+			})
+			It("should suspend, recover the lease, and succeed maintenance", func() {
+				By("Confirming the lease was lost during maintenance")
+				maintenance := &v1beta1.NodeMaintenance{}
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
+					g.Expect(maintenance.Status.LastError).To(ContainSubstring("failed to extend a lease that used to be owned by us"))
+				}, defaultTimeout, defaultInterval).Should(Succeed())
+
+				By("Waiting for NMO to recover the lease and complete maintenance")
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
+					g.Expect(maintenance.Status.Phase).To(Equal(v1beta1.MaintenanceSucceeded))
+					g.Expect(maintenance.Status.ErrorOnLeaseCount).To(Equal(0))
+					g.Expect(maintenance.Status.DrainProgress).To(Equal(100))
+				}, defaultTimeout, defaultInterval).Should(Succeed())
+
+				By("Verifying no FailedMaintenance event was emitted")
+				verifyNoEvent(corev1.EventTypeWarning, utils.EventReasonFailedMaintenance, utils.EventMessageFailedMaintenance)
+				verifyEvent(corev1.EventTypeNormal, utils.EventReasonSucceedMaintenance, utils.EventMessageSucceedMaintenance)
+			})
+		})
+		When("lease is permanently lost during maintenance", func() {
+			BeforeEach(func() {
+				originalLeaseManager := r.LeaseManager
+				// First RequestLease succeeds (NMO starts maintenance), then all
+				// subsequent calls return AlreadyHeldError — simulating the lease
+				// being permanently taken by another entity during maintenance.
+				// ErrorOnLeaseCount exceeds the threshold and NMO gives up.
+				r.LeaseManager = &mockLeaseManager{
+					Manager:            originalLeaseManager.(*mockLeaseManager).Manager,
+					requestLeaseErr:    lease.AlreadyHeldError{},
+					failAfterSuccesses: 1,
+				}
+				DeferCleanup(func() {
+					r.LeaseManager = originalLeaseManager
+				})
+
+				nm = getTestNM("node-maintenance-lease-lost", taintedNodeName)
+				Expect(k8sClient.Create(ctx, nm)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, ctx, nm)
+			})
+			It("should fail maintenance when lease cannot be recovered", func() {
+				By("Waiting for maintenance to start, lease errors to exceed the threshold, and phase to become Failed")
+				maintenance := &v1beta1.NodeMaintenance{}
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nm), maintenance)).To(Succeed())
+					g.Expect(maintenance.Status.DrainProgress).To(BeNumerically(">", 0))
+					g.Expect(maintenance.Status.ErrorOnLeaseCount).To(BeNumerically(">", maxAllowedErrorToUpdateOwnedLease))
+					g.Expect(maintenance.Status.Phase).To(Equal(v1beta1.MaintenanceFailed))
+				}, defaultTimeout, defaultInterval).Should(Succeed())
+
+				By("Verifying maintenance failed event was emitted")
+				verifyEvent(corev1.EventTypeWarning, utils.EventReasonFailedMaintenance, utils.EventMessageFailedMaintenance)
+
+				By("Verifying LastError mentions lease extension failure")
+				Expect(maintenance.Status.LastError).To(ContainSubstring("maintenance failed: lease could not be extended"))
+			})
+		})
 	})
 })
 
@@ -413,8 +575,31 @@ func clearEvents() {
 
 type mockLeaseManager struct {
 	lease.Manager
+	requestLeaseErr error
+
+	// failAfterSuccesses: if > 0, the first N RequestLease calls succeed,
+	// then requestLeaseErr is returned. Use for "succeed then fail" scenarios.
+	failAfterSuccesses int
+	// maxRequestFailures: if > 0, requestLeaseErr is returned for at most N calls,
+	// then nil is returned. 0 means unlimited failures once they start.
+	// Use for "fail then succeed" scenarios.
+	maxRequestFailures int
+
+	callCount int
+	failCount int
 }
 
 func (mock *mockLeaseManager) RequestLease(_ context.Context, _ client.Object, _ time.Duration) error {
-	return nil
+	if mock.requestLeaseErr == nil {
+		return nil
+	}
+	mock.callCount++
+	if mock.failAfterSuccesses > 0 && mock.callCount <= mock.failAfterSuccesses {
+		return nil
+	}
+	if mock.maxRequestFailures > 0 && mock.failCount >= mock.maxRequestFailures {
+		return nil
+	}
+	mock.failCount++
+	return mock.requestLeaseErr
 }

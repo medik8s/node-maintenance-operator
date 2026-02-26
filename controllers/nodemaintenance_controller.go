@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -186,34 +187,46 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	setOwnerRefToNode(nm, node, r.logger)
+	// if we failed to extend a lease that used to be owned by us or there are other errors, then we need to uncordon the node and fail the maintenance
+	if nm.Status.ErrorOnLeaseCount > maxAllowedErrorToUpdateOwnedLease {
+		r.logger.Info("lease could not be extended, failing maintenance", "errorOnLeaseCount", nm.Status.ErrorOnLeaseCount)
 
-	updateOwnedLeaseFailed, err := r.obtainLease(ctx, node)
-	if err != nil && updateOwnedLeaseFailed {
-		nm.Status.ErrorOnLeaseCount += 1
-		if nm.Status.ErrorOnLeaseCount > maxAllowedErrorToUpdateOwnedLease {
-			r.logger.Info("can't extend owned lease. uncordon for now")
-
-			// Uncordon the node
-			err = r.stopNodeMaintenanceImp(ctx, drainer, node)
-			if err != nil {
-				return r.onReconcileError(ctx, nm, drainer, fmt.Errorf("failed to uncordon upon failure to obtain owned lease : %v ", err))
-			}
-			// maintenance has failed - node was uncordon and under maintenance mode
-			utils.WarningEvent(r.Recorder, nm, utils.EventReasonFailedMaintenance, utils.EventMessageFailedMaintenance)
-			nm.Status.Phase = v1beta1.MaintenanceFailed
+		err = r.stopNodeMaintenanceImp(ctx, drainer, node)
+		if err != nil {
+			return r.onReconcileError(ctx, nm, drainer, fmt.Errorf("failed to uncordon upon failure to obtain owned lease: %v", err))
 		}
-		return r.onReconcileError(ctx, nm, drainer, fmt.Errorf("failed to extend lease owned by us : %v errorOnLeaseCount %d", err, nm.Status.ErrorOnLeaseCount))
+		utils.WarningEvent(r.Recorder, nm, utils.EventReasonFailedMaintenance, utils.EventMessageFailedMaintenance)
+		nm.Status.Phase = v1beta1.MaintenanceFailed
+		nm.Status.LastError = fmt.Sprintf("maintenance failed: lease could not be extended after %d attempts", nm.Status.ErrorOnLeaseCount)
+		setLastUpdate(nm)
+		if updateErr := r.Client.Status().Update(ctx, nm); updateErr != nil {
+			r.logger.Error(updateErr, "Failed to update NodeMaintenance status")
+			return ctrl.Result{}, updateErr
+		}
+		return ctrl.Result{}, nil
 	}
+	err = r.LeaseManager.RequestLease(ctx, node, LeaseDuration)
 	if err != nil {
-		nm.Status.ErrorOnLeaseCount = 0
-		return r.onReconcileError(ctx, nm, drainer, err)
-	} else {
-		if nm.Status.Phase != v1beta1.MaintenanceRunning || nm.Status.ErrorOnLeaseCount != 0 {
-			nm.Status.Phase = v1beta1.MaintenanceRunning
-			// Another chance to evict pods - clear ErrorOnLeaseCount and try again to put the node under maintenance
-			nm.Status.ErrorOnLeaseCount = 0
-
+		var alreadyHeldErr lease.AlreadyHeldError
+		if errors.As(err, &alreadyHeldErr) {
+			r.logger.Error(err, "lease is held by another entity")
+			if nm.Status.DrainProgress > 0 {
+				// if we are already in the middle of draining, and we failed to extend a lease that used to be owned by us
+				// then we need to increment the error on lease count and return an error
+				nm.Status.ErrorOnLeaseCount += 1
+				return r.onReconcileError(ctx, nm, drainer, fmt.Errorf("failed to extend a lease that used to be owned by us, incrementing error on lease count: %v, errorOnLeaseCount: %d", err, nm.Status.ErrorOnLeaseCount))
+			}
+			return r.onReconcileError(ctx, nm, drainer, fmt.Errorf("failed to obtain a lease that is not owned by us : %v errorOnLeaseCount %d", err, nm.Status.ErrorOnLeaseCount))
 		}
+		r.logger.Error(err, "failed to request lease, and incrementing error on lease count", "errorOnLeaseCount", nm.Status.ErrorOnLeaseCount)
+		nm.Status.ErrorOnLeaseCount += 1
+		return r.onReconcileError(ctx, nm, drainer, err)
+	}
+	r.logger.Info("lease obtained successfully")
+	if nm.Status.Phase != v1beta1.MaintenanceRunning || nm.Status.ErrorOnLeaseCount != 0 {
+		nm.Status.Phase = v1beta1.MaintenanceRunning
+		// Another chance to evict pods - clear ErrorOnLeaseCount and try again to put the node under maintenance
+		nm.Status.ErrorOnLeaseCount = 0
 	}
 
 	if err := addExcludeRemediationLabel(ctx, node, r.Client, r.logger); err != nil {
@@ -335,18 +348,6 @@ func setOwnerRefToNode(nm *v1beta1.NodeMaintenance, node *corev1.Node, log logr.
 	nm.ObjectMeta.SetOwnerReferences(append(nm.ObjectMeta.GetOwnerReferences(), ref))
 }
 
-func (r *NodeMaintenanceReconciler) obtainLease(ctx context.Context, node *corev1.Node) (bool, error) {
-	r.logger.Info("Lease object supported, obtaining lease")
-	err := r.LeaseManager.RequestLease(ctx, node, LeaseDuration)
-
-	if err != nil {
-		r.logger.Error(err, "failed to create or get existing lease")
-		return false, err
-	}
-
-	return false, nil
-}
-
 func addExcludeRemediationLabel(ctx context.Context, node *corev1.Node, r client.Client, log logr.Logger) error {
 	if node.Labels[commonLabels.ExcludeFromRemediation] != "true" {
 		patch := client.MergeFrom(node.DeepCopy())
@@ -389,7 +390,14 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceImp(ctx context.Context, 
 	// stop maintenance - remove the added taints and uncordon the node
 	utils.NormalEvent(r.Recorder, node, utils.EventReasonUncordonNode, utils.EventMessageUncordonNode)
 	if err := r.LeaseManager.InvalidateLease(ctx, node); err != nil {
-		return err
+		var alreadyHeldErr lease.AlreadyHeldError
+		if errors.As(err, &alreadyHeldErr) {
+			// The lease is held by another entity (e.g. NHC), we don't own it
+			// so there is nothing to invalidate — proceed with cleanup
+			r.logger.Info("lease is held by another entity, then skipping invalidation when stopping node maintenance", "error", err)
+		} else {
+			return err
+		}
 	}
 	return removeExcludeRemediationLabel(ctx, node, r.Client, r.logger)
 }
@@ -400,7 +408,12 @@ func (r *NodeMaintenanceReconciler) stopNodeMaintenanceOnDeletion(ctx context.Co
 		// if CR is gathered as result of garbage collection: the node may have been deleted, but the CR has not yet been deleted, still we must clean up the lease!
 		if apiErrors.IsNotFound(err) {
 			if err := r.LeaseManager.InvalidateLease(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}); err != nil {
-				return err
+				var alreadyHeldErr lease.AlreadyHeldError
+				if errors.As(err, &alreadyHeldErr) {
+					r.logger.Info("lease is held by another entity, skipping invalidation during deletion cleanup", "error", err)
+				} else {
+					return err
+				}
 			}
 			return nil
 		}

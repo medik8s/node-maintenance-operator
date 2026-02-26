@@ -94,7 +94,7 @@ var _ = BeforeSuite(func() {
 		Client:       k8sClient,
 		Scheme:       scheme.Scheme,
 		MgrConfig:    cfg,
-		LeaseManager: &mockLeaseManager{mockManager},
+		LeaseManager: &mockLeaseManager{Manager: mockManager},
 		Recorder:     fakeRecorder,
 		logger:       ctrl.Log.WithName("unit test"),
 	}
