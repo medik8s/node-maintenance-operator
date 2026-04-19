@@ -12,7 +12,7 @@ on: # on events
 jobs: # jobs to run
   build:
     name: Test and build PRs
-    runs-on: ubuntu-22.04 # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#choosing-github-hosted-runners
+    runs-on: ubuntu-24.04 # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#choosing-github-hosted-runners
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
@@ -32,7 +32,7 @@ jobs: # jobs to run
 
   scorecard-k8s:
     name: Test Scorecard Tests # https://sdk.operatorframework.io/docs/testing-operators/scorecard/
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       # see https://github.com/kubernetes-sigs/kind/tags
       KIND_VERSION: v0.22.0
