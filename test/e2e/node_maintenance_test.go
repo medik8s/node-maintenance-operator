@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nmo "github.com/medik8s/node-maintenance-operator/api/v1beta1"
-	nodemaintenance "github.com/medik8s/node-maintenance-operator/controllers"
+	nodemaintenance "github.com/medik8s/node-maintenance-operator/internal/controller"
 	"github.com/medik8s/node-maintenance-operator/pkg/utils"
 )
 
@@ -90,7 +90,7 @@ var _ = Describe("Starting Maintenance", func() {
 			// on Openshift the etcd-quorum-guard PDB should prevent setting maintenance
 			// on k8s the fake etcd-quorum-guard PDB should do as well
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(nmo.ErrorControlPlaneQuorumViolation, controlPlaneNode), "Unexpected error message")
+			Expect(err.Error()).To(ContainSubstring("can not put master/control-plane node into maintenance"), "Unexpected error message")
 			verifyNoEvent(context.Background(), utils.EventReasonBeginMaintenance, objectName)
 		})
 	})
@@ -125,7 +125,7 @@ var _ = Describe("Starting Maintenance", func() {
 
 			err := createCRIgnoreUnrelatedErrors(nodeMaintenance)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(nmo.ErrorControlPlaneQuorumViolation, controlPlaneNode), "Unexpected error message")
+			Expect(err.Error()).To(ContainSubstring("can not put master/control-plane node into maintenance"), "Unexpected error message")
 			verifyNoEvent(context.Background(), utils.EventReasonBeginMaintenance, objectName)
 		})
 	})
@@ -137,7 +137,7 @@ var _ = Describe("Starting Maintenance", func() {
 			nodeMaintenance := getNodeMaintenance(objectName, nodeName)
 			err := createCRIgnoreUnrelatedErrors(nodeMaintenance)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf(nmo.ErrorNodeNotExists, nodeName)), "Unexpected error message")
+			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("no node with name %s found", nodeName)), "Unexpected error message")
 			verifyNoEvent(context.Background(), utils.EventReasonBeginMaintenance, objectName)
 		})
 	})
@@ -164,14 +164,14 @@ var _ = Describe("Starting Maintenance", func() {
 			nmDuplicate := getNodeMaintenance("test-duplicate", maintenanceNodeName)
 			err := createCRIgnoreUnrelatedErrors(nmDuplicate)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf(nmo.ErrorNodeMaintenanceExists, maintenanceNodeName)), "Unexpected error message")
+			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("a NodeMaintenance for node %s already exists", maintenanceNodeName)), "Unexpected error message")
 
 			By("Preventing the update of node name")
 			nmCopy := nodeMaintenance.DeepCopy()
 			nmCopy.Spec.NodeName = "some-random-nodename"
 			err = Client.Patch(context.TODO(), nmCopy, client.MergeFrom(nodeMaintenance), &client.PatchOptions{})
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(nmo.ErrorNodeNameUpdateForbidden), "Unexpected error message")
+			Expect(err.Error()).To(ContainSubstring("updating spec.NodeName isn't allowed"), "Unexpected error message")
 
 			verifyEvent(context.Background(), utils.EventReasonBeginMaintenance, testWorkerMaintenance)
 			verifyEvent(context.Background(), utils.EventReasonSucceedMaintenance, testWorkerMaintenance)

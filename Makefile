@@ -1,21 +1,20 @@
 ## Tool Versions
 
 # See https://github.com/kubernetes-sigs/kustomize for the last version
-KUSTOMIZE_VERSION ?= v5@v5.8.0
+KUSTOMIZE_VERSION ?= v5@v5.8.1
 # https://github.com/kubernetes-sigs/controller-tools/releases for the last version
-CONTROLLER_GEN_VERSION ?= v0.20.0
+CONTROLLER_GEN_VERSION ?= v0.20.1
 # See https://pkg.go.dev/sigs.k8s.io/controller-runtime/tools/setup-envtest?tab=versions for the last version
 ENVTEST_VERSION ?= v0.0.0-20260120065648-aebc15d7c689
 # See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
-GOIMPORTS_VERSION ?= v0.38.0
+GOIMPORTS_VERSION ?= v0.44.0
 # See https://github.com/onsi/ginkgo/releases for the last version
 # TODO get rid of this, check other operators
 GINKGO_VERSION ?= v2.27.5
 # See github.com/operator-framework/operator-registry/releases for the last version
-OPM_VERSION ?= v1.61.0
+OPM_VERSION ?= v1.66.0
 # See github.com/operator-framework/operator-sdk/releases for the last version
-# heads up: 1.37 is the last version which supports go/v3!
-OPERATOR_SDK_VERSION = v1.37.0
+OPERATOR_SDK_VERSION = v1.42.2
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.34
 # See https://github.com/slintes/sort-imports/releases for the last version
@@ -23,9 +22,8 @@ SORT_IMPORTS_VERSION = v0.3.0
 # OCP Version: for OKD bundle community
 OCP_VERSION ?= 4.20
 # update for major version updates to YQ_VERSION! see https://github.com/mikefarah/yq
-# NOTE: v4.42.1 is the latest supporting go 1.20
 YQ_API_VERSION = v4
-YQ_VERSION = v4.50.1
+YQ_VERSION = v4.53.2
 
 BLUE_ICON_PATH = "./config/assets/nmo_blue_icon.png"
 
@@ -151,11 +149,11 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 
 .PHONY: fmt
 fmt: goimports ## Run go goimports against code - goimports = go fmt + fixing imports.
-	$(GOIMPORTS) -w ./api ./controllers ./test
+	$(GOIMPORTS) -w ./api ./cmd ./internal ./pkg ./test
 
 .PHONY: vet
 vet: ## Run go vet against code - report likely mistakes in packages.
-	go vet ./api/... ./controllers/... ./test/...
+	go vet ./api/... ./cmd/... ./internal/controller/... ./internal/webhook/... ./pkg/... ./test/...
 
 .PHONY: go-tidy
 go-tidy: # Run go mod tidy - add missing and remove unused modules.
@@ -183,7 +181,7 @@ test: test-no-verify verify-unchanged ## Generate and format code, run tests, ge
 .PHONY: test-no-verify
 test-no-verify: go-verify manifests generate fmt fix-imports vet envtest ginkgo ## Generate and format code, and run tests
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" \
-	$(GINKGO) -r --keep-going --randomize-all --require-suite --vv --coverprofile cover.out ./controllers/... ./api/... ./pkg/...
+	$(GINKGO) -r --keep-going --randomize-all --require-suite --vv --coverprofile cover.out ./internal/controller/... ./internal/webhook/... ./api/... ./pkg/...
 
 .PHONY: bundle-run
 bundle-run: operator-sdk ## Run bundle image. Default NS is "openshift-workload-availability", redefine OPERATOR_NAMESPACE to override it.

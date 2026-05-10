@@ -42,7 +42,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/api/v1beta1"
-	"github.com/medik8s/node-maintenance-operator/controllers"
+	"github.com/medik8s/node-maintenance-operator/internal/controller"
+	webhookv1beta1 "github.com/medik8s/node-maintenance-operator/internal/webhook/v1beta1"
 	"github.com/medik8s/node-maintenance-operator/pkg/utils"
 	"github.com/medik8s/node-maintenance-operator/version"
 	//+kubebuilder:scaffold:imports
@@ -52,7 +53,7 @@ const (
 	WebhookCertDir  = "/apiserver.local.config/certificates"
 	WebhookCertName = "apiserver.crt"
 	WebhookKeyName  = "apiserver.key"
-	operatorName = "NodeMaintenance"
+	operatorName    = "NodeMaintenance"
 )
 
 var (
@@ -69,10 +70,10 @@ func init() {
 
 func main() {
 	var (
-		metricsAddr, probeAddr string
+		metricsAddr, probeAddr            string
 		enableLeaderElection, enableHTTP2 bool
-		webhookOpts          webhook.Options
-	) 
+		webhookOpts                       webhook.Options
+	)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -94,7 +95,7 @@ func main() {
 	configureWebhookOpts(&webhookOpts, enableHTTP2)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
+		Scheme:                 scheme,
 		WebhookServer:          webhook.NewServer(webhookOpts),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
@@ -105,36 +106,34 @@ func main() {
 		os.Exit(1)
 	}
 
-
 	cl := mgr.GetClient()
 	leaseManagerInitializer := &leaseManagerInitializer{cl: cl}
 	if err := mgr.Add(leaseManagerInitializer); err != nil {
 		setupLog.Error(err, "unable to set up lease Manager", "lease", operatorName)
 		os.Exit(1)
 	}
-	
-	openshiftCheck,err := utils.NewOpenshiftValidator(mgr.GetConfig())
+
+	openshiftCheck, err := utils.NewOpenshiftValidator(mgr.GetConfig())
 	if err != nil {
 		setupLog.Error(err, "failed to check if we run on Openshift")
 		os.Exit(1)
 	}
 	isOpenShift := openshiftCheck.IsOpenshiftSupported()
-	if isOpenShift{
+	if isOpenShift {
 		setupLog.Info("NMO was installed on Openshift cluster")
 	}
-	
 
-	if err = (&controllers.NodeMaintenanceReconciler{
+	if err = (&controller.NodeMaintenanceReconciler{
 		Client:       cl,
 		Scheme:       mgr.GetScheme(),
 		MgrConfig:    mgr.GetConfig(),
 		LeaseManager: leaseManagerInitializer,
-		Recorder: mgr.GetEventRecorderFor(operatorName),
+		Recorder:     mgr.GetEventRecorderFor(operatorName),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", operatorName)
 		os.Exit(1)
 	}
-	if err = (&nodemaintenancev1beta1.NodeMaintenance{}).SetupWebhookWithManager(isOpenShift, mgr); err != nil {
+	if err = webhookv1beta1.SetupNodeMaintenanceWebhookWithManager(isOpenShift, mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", operatorName)
 		os.Exit(1)
 	}
@@ -171,7 +170,7 @@ type leaseManagerInitializer struct {
 
 func (ls *leaseManagerInitializer) Start(context.Context) error {
 	var err error
-	ls.Manager, err = lease.NewManager(ls.cl, controllers.LeaseHolderIdentity)
+	ls.Manager, err = lease.NewManager(ls.cl, controller.LeaseHolderIdentity)
 	return err
 }
 

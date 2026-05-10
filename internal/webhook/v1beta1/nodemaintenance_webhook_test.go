@@ -11,6 +11,8 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/api/v1beta1"
 )
 
 var _ = Describe("NodeMaintenance Validation", func() {
@@ -24,7 +26,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 		// create quorum ns on 1st run
 		quorumNs := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: EtcdQuorumPDBNamespace,
+				Name: etcdQuorumPDBNamespace,
 			},
 		}
 		if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(quorumNs), &corev1.Namespace{}); err != nil {
@@ -40,7 +42,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 				nm := getTestNMO(nonExistingNodeName)
 				err := k8sClient.Create(context.Background(), nm)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring(ErrorNodeNotExists, nonExistingNodeName))
+				Expect(err.Error()).To(ContainSubstring(errorNodeNotExists, nonExistingNodeName))
 			})
 
 		})
@@ -48,7 +50,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 		Context("for node already in maintenance", func() {
 
 			var node *corev1.Node
-			var nmExisting *NodeMaintenance
+			var nmExisting *nodemaintenancev1beta1.NodeMaintenance
 
 			BeforeEach(func() {
 				// add a node and node maintenance CR to fake client
@@ -71,7 +73,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 					return err
 				}, time.Second, 200*time.Millisecond).Should(And(
 					HaveOccurred(),
-					WithTransform(func(err error) string { return err.Error() }, ContainSubstring(ErrorNodeMaintenanceExists, existingNodeName)),
+					WithTransform(func(err error) string { return err.Error() }, ContainSubstring(errorNodeMaintenanceExists, existingNodeName)),
 				))
 			})
 
@@ -120,7 +122,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 						nm := getTestNMO(existingNodeName)
 						err := k8sClient.Create(context.Background(), nm)
 						Expect(err).To(HaveOccurred())
-						Expect(err.Error()).To(ContainSubstring(ErrorControlPlaneQuorumViolation, node.Name))
+						Expect(err.Error()).To(ContainSubstring(errorControlPlaneQuorumViolation, node.Name))
 					})
 				})
 				When("node doesn't have etcd guard pod", func() {
@@ -156,7 +158,7 @@ var _ = Describe("NodeMaintenance Validation", func() {
 					nm := getTestNMO(existingNodeName)
 					err := k8sClient.Create(context.Background(), nm)
 					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring(ErrorControlPlaneQuorumViolation, node.Name))
+					Expect(err.Error()).To(ContainSubstring(errorControlPlaneQuorumViolation, node.Name))
 				})
 
 			})
@@ -186,19 +188,19 @@ var _ = Describe("NodeMaintenance Validation", func() {
 				nm.Spec.NodeName = "new-node-name"
 				err := k8sClient.Update(context.Background(), nm)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring(ErrorNodeNameUpdateForbidden))
+				Expect(err.Error()).To(ContainSubstring(errorNodeNameUpdateForbidden))
 			})
 
 		})
 	})
 })
 
-func getTestNMO(nodeName string) *NodeMaintenance {
-	return &NodeMaintenance{
+func getTestNMO(nodeName string) *nodemaintenancev1beta1.NodeMaintenance {
+	return &nodemaintenancev1beta1.NodeMaintenance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-" + nodeName,
 		},
-		Spec: NodeMaintenanceSpec{
+		Spec: nodemaintenancev1beta1.NodeMaintenanceSpec{
 			NodeName: nodeName,
 		},
 	}
@@ -221,8 +223,8 @@ func getTestNode(name string, isControlPlane bool) *corev1.Node {
 func getTestPDB() *policyv1.PodDisruptionBudget {
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: EtcdQuorumPDBNamespace,
-			Name:      EtcdQuorumPDBNewName,
+			Namespace: etcdQuorumPDBNamespace,
+			Name:      etcdQuorumPDBNewName,
 		},
 	}
 }
@@ -237,7 +239,7 @@ func getPodGuard(nodeName string) *corev1.Pod {
 		TypeMeta: metav1.TypeMeta{Kind: "Pod"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "guard-" + nodeName,
-			Namespace: EtcdQuorumPDBNamespace,
+			Namespace: etcdQuorumPDBNamespace,
 			Labels: map[string]string{
 				"app": "guard",
 			},
