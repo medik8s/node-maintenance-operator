@@ -10,7 +10,7 @@ ENVTEST_VERSION ?= v0.0.0-20260120065648-aebc15d7c689
 GOIMPORTS_VERSION ?= v0.44.0
 # See https://github.com/onsi/ginkgo/releases for the last version
 # TODO get rid of this, check other operators
-GINKGO_VERSION ?= v2.27.5
+GINKGO_VERSION ?= v2.28.3
 # See github.com/operator-framework/operator-registry/releases for the last version
 OPM_VERSION ?= v1.66.0
 # See github.com/operator-framework/operator-sdk/releases for the last version
