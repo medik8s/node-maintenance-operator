@@ -3,15 +3,17 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
+    app.kubernetes.io/name: node-maintenance-operator
     node-maintenance-operator: ""
-  name: node-maintenance-operator-webhook-service
+  name: node-maintenance-webhook-service
 spec:
   ports:
   - port: 443
     protocol: TCP
     targetPort: 9443
   selector:
-    control-plane: controller-manager
+    app.kubernetes.io/component: controller-manager
+    app.kubernetes.io/name: node-maintenance-operator
     node-maintenance-operator: ""
 status:
   loadBalancer: {}
