@@ -1,5 +1,5 @@
 resources:
 - ../manifests
 
-patchesStrategicMerge:
-  - seccomp_patch.yaml
+patches:
+  - path: seccomp_patch.yaml

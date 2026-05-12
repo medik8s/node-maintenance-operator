@@ -5,12 +5,12 @@ resources:
 configurations:
 - kustomizeconfig.yaml
 
-patchesStrategicMerge:
-- |-
-  apiVersion: admissionregistration.k8s.io/v1
-  kind: ValidatingWebhookConfiguration
-  metadata:
-    name: validating-webhook-configuration
-  webhooks:
-    - name: vnodemaintenance.kb.io
-      timeoutSeconds: 15
+patches:
+- patch: |-
+    apiVersion: admissionregistration.k8s.io/v1
+    kind: ValidatingWebhookConfiguration
+    metadata:
+      name: validating-webhook-configuration
+    webhooks:
+      - name: vnodemaintenance.kb.io
+        timeoutSeconds: 15

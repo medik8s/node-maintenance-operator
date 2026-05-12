@@ -7,8 +7,8 @@ import (
 )
 
 type OpenshiftValidator struct {
-// isOpenshiftSupported will be set to true in case the operator was installed on OpenShift cluster
- isOpenshiftSupported bool
+	// isOpenshiftSupported will be set to true in case the operator was installed on OpenShift cluster
+	isOpenshiftSupported bool
 }
 
 // NewOpenshiftValidator initialization function for OpenshiftValidator
@@ -24,6 +24,7 @@ func NewOpenshiftValidator(config *rest.Config) (*OpenshiftValidator, error) {
 func (v *OpenshiftValidator) IsOpenshiftSupported() bool {
 	return v.isOpenshiftSupported
 }
+
 // validateIsOpenshift returns true if the cluster has the openshift config group
 func (v *OpenshiftValidator) validateIsOpenshift(config *rest.Config) error {
 	dc, err := discovery.NewDiscoveryClientForConfig(config)
