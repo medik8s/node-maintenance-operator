@@ -247,8 +247,9 @@ spec:
               containers:
               - args:
                 - --health-probe-bind-address=:8081
-                - --metrics-bind-address=:8080
+                - --metrics-bind-address=:8443
                 - --leader-elect
+                - --enable-http2=false
                 command:
                 - /manager
                 env:
@@ -267,6 +268,9 @@ spec:
                 ports:
                 - containerPort: 9443
                   name: webhook-server
+                  protocol: TCP
+                - containerPort: 8443
+                  name: https
                   protocol: TCP
                 readinessProbe:
                   httpGet:
