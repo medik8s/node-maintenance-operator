@@ -6,12 +6,22 @@ filters:
       - razo7
       - mshitrit
       - clobrano
+      - weshayutin
+      - mpryc
+      - jmontleon
+      - abrugaro
+      - eemcmullan
     approvers:
       - beekhof
       - slintes
       - razo7
       - mshitrit
       - clobrano
+      - weshayutin
+      - mpryc
+      - jmontleon
+      - abrugaro
+      - eemcmullan
 
     # Specify only if your Bugzilla product is not OCP
     product: "Kubernetes-native Infrastructure"
