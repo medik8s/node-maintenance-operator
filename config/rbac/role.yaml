@@ -73,6 +73,14 @@ rules:
   - create
   - get
 - apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - create
+  - delete
+  - update
+- apiGroups:
   - nodemaintenance.medik8s.io
   resources:
   - nodemaintenances
