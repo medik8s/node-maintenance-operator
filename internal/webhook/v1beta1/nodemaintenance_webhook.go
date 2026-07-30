@@ -25,7 +25,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,8 +53,7 @@ var nodemaintenancelog = logf.Log.WithName("nodemaintenance-resource")
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
 func SetupNodeMaintenanceWebhookWithManager(isOpenShift bool, mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(&nodemaintenancev1beta1.NodeMaintenance{}).
+	return ctrl.NewWebhookManagedBy(mgr, &nodemaintenancev1beta1.NodeMaintenance{}).
 		WithValidator(&nodeMaintenanceValidator{
 			client:      mgr.GetClient(),
 			isOpenShift: isOpenShift,
@@ -71,14 +69,10 @@ type nodeMaintenanceValidator struct {
 	isOpenShift bool
 }
 
-var _ admission.CustomValidator = &nodeMaintenanceValidator{}
+var _ admission.Validator[*nodemaintenancev1beta1.NodeMaintenance] = &nodeMaintenanceValidator{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (v *nodeMaintenanceValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	nm, ok := obj.(*nodemaintenancev1beta1.NodeMaintenance)
-	if !ok {
-		return nil, fmt.Errorf("expected a NodeMaintenance but got a %T", obj)
-	}
+func (v *nodeMaintenanceValidator) ValidateCreate(_ context.Context, nm *nodemaintenancev1beta1.NodeMaintenance) (admission.Warnings, error) {
 	nodemaintenancelog.Info("validate create", "name", nm.Name)
 
 	// Validate that node with given name exists
@@ -104,32 +98,18 @@ func (v *nodeMaintenanceValidator) ValidateCreate(_ context.Context, obj runtime
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (v *nodeMaintenanceValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	nmNew, ok := newObj.(*nodemaintenancev1beta1.NodeMaintenance)
-	if !ok {
-		return nil, fmt.Errorf("expected a NodeMaintenance but got a %T", newObj)
-	}
-	nmOld, ok := oldObj.(*nodemaintenancev1beta1.NodeMaintenance)
-	if !ok {
-		return nil, fmt.Errorf("expected a NodeMaintenance but got a %T", oldObj)
-	}
-
+func (v *nodeMaintenanceValidator) ValidateUpdate(_ context.Context, nmOld, nmNew *nodemaintenancev1beta1.NodeMaintenance) (admission.Warnings, error) {
 	// Validate that node name didn't change
 	if nmNew.Spec.NodeName != nmOld.Spec.NodeName {
 		nodemaintenancelog.Info("validation failed", "error", errorNodeNameUpdateForbidden)
 		return nil, fmt.Errorf(errorNodeNameUpdateForbidden)
 	}
 	return nil, nil
-
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (v *nodeMaintenanceValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	nmo, ok := obj.(*nodemaintenancev1beta1.NodeMaintenance)
-	if !ok {
-		return nil, fmt.Errorf("expected a NodeMaintenance but got a %T", obj)
-	}
-	nodemaintenancelog.Info("validate delete", "name", nmo.Name)
+func (v *nodeMaintenanceValidator) ValidateDelete(_ context.Context, nm *nodemaintenancev1beta1.NodeMaintenance) (admission.Warnings, error) {
+	nodemaintenancelog.Info("validate delete", "name", nm.Name)
 	return nil, nil
 }
 
