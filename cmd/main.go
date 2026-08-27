@@ -49,11 +49,11 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	openshifttls "github.com/openshift/controller-runtime-common/pkg/tls"
 
-	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/api/v1beta1"
-	"github.com/medik8s/node-maintenance-operator/internal/controller"
-	webhookv1beta1 "github.com/medik8s/node-maintenance-operator/internal/webhook/v1beta1"
-	"github.com/medik8s/node-maintenance-operator/pkg/utils"
-	"github.com/medik8s/node-maintenance-operator/version"
+	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/v5/api/v1beta1"
+	"github.com/medik8s/node-maintenance-operator/v5/internal/controller"
+	webhookv1beta1 "github.com/medik8s/node-maintenance-operator/v5/internal/webhook/v1beta1"
+	"github.com/medik8s/node-maintenance-operator/v5/pkg/utils"
+	"github.com/medik8s/node-maintenance-operator/v5/version"
 	//+kubebuilder:scaffold:imports
 )
 
