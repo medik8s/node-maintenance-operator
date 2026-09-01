@@ -28,7 +28,7 @@ metadata:
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/medik8s/node-maintenance-operator
     support: Medik8s
-  name: node-maintenance-operator.v5.8.0
+  name: medik8s-node-maintenance-operator.v5.8.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
