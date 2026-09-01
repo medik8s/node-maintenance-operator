@@ -28,7 +28,7 @@ metadata:
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/medik8s/node-maintenance-operator
     support: Medik8s
-  name: node-maintenance-operator.v0.0.1
+  name: node-maintenance-operator.v5.8.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -378,7 +378,7 @@ spec:
   provider:
     name: Medik8s
     url: https://github.com/medik8s
-  version: 0.0.1
+  version: 5.8.0
   webhookdefinitions:
   - admissionReviewVersions:
     - v1

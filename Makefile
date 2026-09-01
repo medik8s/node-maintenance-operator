@@ -32,7 +32,7 @@ IMAGE_REGISTRY ?= quay.io/medik8s
 export IMAGE_REGISTRY
 
 # When no version is set, use latest as image tags
-DEFAULT_VERSION := 0.0.1
+DEFAULT_VERSION := 5.8.0
 ifeq ($(origin VERSION), undefined)
 IMAGE_TAG = latest
 else ifeq ($(VERSION), $(DEFAULT_VERSION))
