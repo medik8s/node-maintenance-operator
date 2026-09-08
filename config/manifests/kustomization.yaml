@@ -1,7 +1,7 @@
 # These resources constitute the fully configured set of manifests
 # used to generate the 'manifests/' directory in a bundle.
 resources:
-- bases/node-maintenance-operator.clusterserviceversion.yaml
+- bases/medik8s-node-maintenance-operator.clusterserviceversion.yaml
 - ../default
 - ../samples
 - ../scorecard
@@ -30,7 +30,7 @@ patches:
     group: operators.coreos.com
     version: v1alpha1
     kind: ClusterServiceVersion
-    name: node-maintenance-operator.v0.0.0
+    name: medik8s-node-maintenance-operator.v0.0.0
     namespace: placeholder
   patch: |-
     # Add base64 encoded icon, original is nmo_blue_icon.png
