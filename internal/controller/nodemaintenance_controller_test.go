@@ -18,8 +18,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/medik8s/node-maintenance-operator/api/v1beta1"
-	utils "github.com/medik8s/node-maintenance-operator/pkg/utils"
+	"github.com/medik8s/node-maintenance-operator/v5/api/v1beta1"
+	utils "github.com/medik8s/node-maintenance-operator/v5/pkg/utils"
 )
 
 const (

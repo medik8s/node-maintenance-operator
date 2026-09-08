@@ -43,8 +43,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/medik8s/node-maintenance-operator/api/v1beta1"
-	"github.com/medik8s/node-maintenance-operator/pkg/utils"
+	"github.com/medik8s/node-maintenance-operator/v5/api/v1beta1"
+	"github.com/medik8s/node-maintenance-operator/v5/pkg/utils"
 )
 
 const (

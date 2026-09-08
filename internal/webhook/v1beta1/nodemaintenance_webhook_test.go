@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/api/v1beta1"
+	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/v5/api/v1beta1"
 )
 
 var _ = Describe("NodeMaintenance Validation", func() {

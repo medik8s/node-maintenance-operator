@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/medik8s/node-maintenance-operator/api/v1beta1"
+	"github.com/medik8s/node-maintenance-operator/v5/api/v1beta1"
 )
 
 const (
