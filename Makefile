@@ -520,3 +520,7 @@ container-build-and-push-community: container-build-community container-push ## 
 .PHONY: cluster-functest
 cluster-functest: ginkgo ## Run e2e tests in a real cluster
 	./hack/functest.sh $(GINKGO_VERSION)
+
+# Source-to-OLM deployment is kept in a separate makefile so the existing
+# development and release targets above retain their current behavior.
+-include Makefile.olm
