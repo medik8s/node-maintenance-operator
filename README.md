@@ -40,6 +40,22 @@ and follow its instructions to install the [Operator Lifecycle Manager (OLM)](ht
 Follow the instructions [here](https://sdk.operatorframework.io/docs/building-operators/golang/tutorial/#3-deploy-your-operator-with-olm) for deploying the operator with OLM.
 > *Note*: Webhook cannot run using `make deploy`, because the volume mount of the webserver certificate is not found.
 
+For PR or branch testing, you can instead build the operator with the pinned
+source-deployment toolchain, push temporary images to `ttl.sh`, and install the
+generated OLM bundle with operator-sdk:
+
+```bash
+make deploy-olm
+```
+
+The temporary images expire after one hour by default. Override the duration
+and deployment namespace when needed, for example:
+
+```bash
+TTL_DURATION=4h OLM_OPERATOR_NAMESPACE=openshift-workload-availability make deploy-olm
+make undeploy-olm
+```
+
 ## Setting Node Maintenance
 
 ### Set Maintenance on - Create a NodeMaintenance CR
