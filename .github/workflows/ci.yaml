@@ -1,0 +1,11 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  ci:
+    uses: medik8s/.github/.github/workflows/ci.yaml@main
