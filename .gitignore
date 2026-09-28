@@ -87,3 +87,4 @@ tags
 
 catalog/
 catalog.Dockerfile
+.tools/
