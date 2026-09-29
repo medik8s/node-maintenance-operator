@@ -124,6 +124,12 @@ var _ = Describe("NodeMaintenance Validation", func() {
 						Expect(err).To(HaveOccurred())
 						Expect(err.Error()).To(ContainSubstring(errorControlPlaneQuorumViolation, node.Name))
 					})
+					It("should also be rejected on Kubernetes when the guard PDB exists", func() {
+						validator := &nodeMaintenanceValidator{client: k8sClient, isOpenShift: false}
+						err := validator.validateControlPlaneQuorum(existingNodeName)
+						Expect(err).To(HaveOccurred())
+						Expect(err.Error()).To(ContainSubstring(errorControlPlaneQuorumViolation, node.Name))
+					})
 				})
 				When("node doesn't have etcd guard pod", func() {
 					It("should be allowed", func() {
@@ -159,6 +165,11 @@ var _ = Describe("NodeMaintenance Validation", func() {
 					err := k8sClient.Create(context.Background(), nm)
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring(errorControlPlaneQuorumViolation, node.Name))
+				})
+
+				It("should be allowed on Kubernetes", func() {
+					validator := &nodeMaintenanceValidator{client: k8sClient, isOpenShift: false}
+					Expect(validator.validateControlPlaneQuorum(existingNodeName)).To(Succeed())
 				})
 
 			})
