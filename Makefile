@@ -124,6 +124,10 @@ ifeq (,$(shell which kubectl))
 KUBECTL=oc
 endif
 
+# CONTAINER_TOOL defines the container tool to be used for building images.
+CONTAINER_TOOL ?= podman
+export CONTAINER_TOOL
+
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -283,11 +287,11 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: docker-build
 docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+	$(CONTAINER_TOOL) build -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
+	$(CONTAINER_TOOL) push ${IMG}
 
 ##@ Deployment
 
@@ -481,7 +485,7 @@ catalog-build: opm ## Build a file-based catalog image.
 	$(OPM) render ${BUNDLE_IMG} --output yaml >> ${CATALOG_INDEX}
 	$(MAKE) add_channel_entry_for_the_bundle
 	$(OPM) validate ${CATALOG_DIR}
-	docker build . -f ${CATALOG_DOCKERFILE} -t ${CATALOG_IMG}
+	$(CONTAINER_TOOL) build . -f ${CATALOG_DOCKERFILE} -t ${CATALOG_IMG}
 	# Clean up the catalog directory and Dockerfile
 	-rm -rf ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
 
