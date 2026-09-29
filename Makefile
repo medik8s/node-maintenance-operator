@@ -521,10 +521,14 @@ container-build-and-push-community: container-build-community container-push ## 
 cluster-functest: ginkgo ## Run e2e tests in a real cluster
 	./hack/functest.sh $(GINKGO_VERSION)
 
-
 # Shared dev environment
-# Uses a local sibling checkout if available (e.g. ../tools), otherwise
-# downloads medik8s/tools into .tools/ when a dev-* target is first used.
+# Uses a local sibling checkout if available (e.g. ../tools),
+# otherwise downloads the tools repo into .tools/ on first dev-* target use.
+#
+# IMPORTANT: Do NOT use $(shell git clone ...) here — $(shell) executes at
+# Makefile parse time, so any make invocation (make build, make test, make help)
+# would trigger a git clone. The dev-% fallback rule below is lazy: the clone
+# only runs when a dev-* target is actually invoked.
 TOOLS_DIR ?= $(shell cd .. && pwd)/tools
 DEV_MK := $(TOOLS_DIR)/dev/dev.mk
 ifeq ($(wildcard $(DEV_MK)),)
@@ -539,7 +543,8 @@ dev-%:
 		if [ -f $(TOOLS_DIR)/.managed-by-makefile ]; then \
 			echo "  Removing stale $(TOOLS_DIR)..."; rm -rf $(TOOLS_DIR); \
 		else \
-			echo "Error: $(TOOLS_DIR) exists but was not created by this Makefile."; exit 1; \
+			echo "Error: $(TOOLS_DIR) exists but was not created by this Makefile (missing .managed-by-makefile sentinel)."; \
+			echo "       Remove it manually or set TOOLS_DIR to a valid medik8s/tools checkout."; exit 1; \
 		fi; \
 	fi
 	@git clone --depth 1 https://github.com/medik8s/tools.git $(TOOLS_DIR)
