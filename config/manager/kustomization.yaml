@@ -8,4 +8,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/medik8s/node-maintenance-operator
-  newTag: latest
+  newTag: v5.8.0
