@@ -124,6 +124,15 @@ ifeq (,$(shell which kubectl))
 KUBECTL=oc
 endif
 
+# CONTAINER_TOOL defines the container tool to be used for building images.
+CONTAINER_TOOL ?= $(shell \
+	if command -v podman >/dev/null 2>&1; then echo podman; \
+	elif command -v docker >/dev/null 2>&1; then echo docker; \
+	else echo podman; \
+	fi \
+)
+export CONTAINER_TOOL
+
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -283,11 +292,11 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: docker-build
 docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+	$(CONTAINER_TOOL) build -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
+	$(CONTAINER_TOOL) push ${IMG}
 
 ##@ Deployment
 
@@ -401,12 +410,13 @@ bundle-validate: operator-sdk ## Validate the bundle directory with additional v
 	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
 
 .PHONY: bundle-build
-bundle-build: bundle-update ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+bundle-build: bundle ## Build the bundle image.
+	$(MAKE) bundle-update
+	$(CONTAINER_TOOL) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
-	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+	$(CONTAINER_TOOL) push $(BUNDLE_IMG)
 
 .PHONY: opm
 opm: ## Download opm locally if necessary.
@@ -481,13 +491,13 @@ catalog-build: opm ## Build a file-based catalog image.
 	$(OPM) render ${BUNDLE_IMG} --output yaml >> ${CATALOG_INDEX}
 	$(MAKE) add_channel_entry_for_the_bundle
 	$(OPM) validate ${CATALOG_DIR}
-	docker build . -f ${CATALOG_DOCKERFILE} -t ${CATALOG_IMG}
+	$(CONTAINER_TOOL) build . -f ${CATALOG_DOCKERFILE} -t ${CATALOG_IMG}
 	# Clean up the catalog directory and Dockerfile
 	-rm -rf ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
 
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
-	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+	$(CONTAINER_TOOL) push $(CATALOG_IMG)
 
 ##@ Targets used by CI
 
@@ -501,12 +511,12 @@ verify-unchanged: ## Verify there are no un-committed changes
 
 .PHONY: container-build
 container-build: test ## Build containers
-	make bundle
-	make docker-build bundle-build
+	$(MAKE) bundle
+	$(MAKE) docker-build bundle-build
 
 .PHONY: bundle-build-community
 bundle-build-community: bundle-community-k8s ## Run bundle community changes in CSV, and then build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(CONTAINER_TOOL) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: container-build-community
 container-build-community: docker-build bundle-build-community ## Build containers for community
