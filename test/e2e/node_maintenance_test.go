@@ -23,9 +23,9 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nmo "github.com/medik8s/node-maintenance-operator/api/v1beta1"
-	nodemaintenance "github.com/medik8s/node-maintenance-operator/internal/controller"
-	"github.com/medik8s/node-maintenance-operator/pkg/utils"
+	nmo "github.com/medik8s/node-maintenance-operator/v5/api/v1beta1"
+	nodemaintenance "github.com/medik8s/node-maintenance-operator/v5/internal/controller"
+	"github.com/medik8s/node-maintenance-operator/v5/pkg/utils"
 )
 
 const (

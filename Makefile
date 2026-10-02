@@ -31,15 +31,9 @@ BLUE_ICON_PATH = "./config/assets/nmo_blue_icon.png"
 IMAGE_REGISTRY ?= quay.io/medik8s
 export IMAGE_REGISTRY
 
-# When no version is set, use latest as image tags
-DEFAULT_VERSION := 0.0.1
-ifeq ($(origin VERSION), undefined)
-IMAGE_TAG = latest
-else ifeq ($(VERSION), $(DEFAULT_VERSION))
-IMAGE_TAG = latest
-else
+# Use the selected version for image tags.
+DEFAULT_VERSION := 5.8.0
 IMAGE_TAG = v$(VERSION)
-endif
 export IMAGE_TAG
 
 CHANNELS ?= stable
@@ -65,8 +59,8 @@ endif
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 CI_VERSION := 9.9.9-dummy
 VERSION ?= $(DEFAULT_VERSION)
-PREVIOUS_VERSION ?= $(DEFAULT_VERSION)
-SKIP_RANGE_LOWER ?=
+PREVIOUS_VERSION ?= 5.7.1
+SKIP_RANGE_LOWER ?= 0.12.0
 export VERSION
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -224,19 +218,12 @@ bundle-update: ## Update CSV fields and validate the bundle directory
 
 .PHONY: add-replaces-field
 add-replaces-field: ## Add replaces field to the CSV
-	# add replaces field when building versioned bundle
-	@if [ $(VERSION) != $(DEFAULT_VERSION) ]; then \
-		if [ $(PREVIOUS_VERSION) == $(DEFAULT_VERSION) ]; then \
-			echo "Error: PREVIOUS_VERSION must be set for versioned builds"; \
-			exit 1; \
-		elif [ $(shell ./hack/semver_cmp.sh $(VERSION) $(PREVIOUS_VERSION)) != 1 ]; then \
-			echo "Error: VERSION ($(VERSION)) must be greater than PREVIOUS_VERSION ($(PREVIOUS_VERSION))"; \
-			exit 1; \
-		else \
-		  	# preferring sed here, in order to have "replaces" near "version" \
-			sed -r -i "/  version: $(VERSION)/ a\  replaces: $(OPERATOR_NAME).v$(PREVIOUS_VERSION)" ${CSV}; \
-		fi \
+	@if [ -z "$(PREVIOUS_VERSION)" ] || [ "$(PREVIOUS_VERSION)" = "$(VERSION)" ]; then \
+		echo "Error: PREVIOUS_VERSION must be set and differ from VERSION"; \
+		exit 1; \
 	fi
+	sed -r -i "/  replaces:.*/d" ${CSV}
+	sed -r -i "/  version: $(VERSION)/ a\  replaces: $(OPERATOR_NAME).v$(PREVIOUS_VERSION)" ${CSV}
 
 .PHONY: bundle-reset-date
 bundle-reset-date: ## Reset bundle's createdAt
@@ -436,7 +423,7 @@ CATALOG_DOCKERFILE := ${CATALOG_DIR}.Dockerfile
 CATALOG_INDEX := $(CATALOG_DIR)/index.yaml
 
 # Add olm.channel entries for each channel in CHANNELS.
-# For development version (0.0.1), omit replaces and skipRange to avoid OLM catalog validation errors.
+# Keep the default candidate's upgrade edge in the catalog.
 .PHONY: add_channel_entry_for_the_bundle
 add_channel_entry_for_the_bundle:
 	@for channel in $(shell echo ${CHANNELS} | tr ',' ' '); do \
@@ -447,10 +434,10 @@ add_channel_entry_for_the_bundle:
 		echo "entries:" >> ${CATALOG_INDEX}; \
 		echo "  - name: ${OPERATOR_NAME}.v${VERSION}" >> ${CATALOG_INDEX}; \
 		\
-		if [ -n "${PREVIOUS_VERSION}" ] && [ "${VERSION}" != "${DEFAULT_VERSION}" ] && [ "${PREVIOUS_VERSION}" != "${DEFAULT_VERSION}" ]; then \
+		if [ -n "${PREVIOUS_VERSION}" ]; then \
 			echo "    replaces: ${OPERATOR_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
 		fi; \
-		if [ -n "${SKIP_RANGE_LOWER}" ] && [ "${VERSION}" != "${DEFAULT_VERSION}" ] && [ "${VERSION}" != "${SKIP_RANGE_LOWER}" ]; then \
+		if [ -n "${SKIP_RANGE_LOWER}" ] && [ "${VERSION}" != "${SKIP_RANGE_LOWER}" ]; then \
 			if ! printf '%s\n' "${SKIP_RANGE_LOWER}" "${VERSION}" | sort -V -C 2>/dev/null; then \
 				echo "Error: VERSION (${VERSION}) must be greater than SKIP_RANGE_LOWER (${SKIP_RANGE_LOWER})"; \
 				exit 1; \
@@ -495,8 +482,15 @@ catalog-push: ## Push a catalog image.
 test-scorecard: operator-sdk ## Run Scorecard testing for the bundle directory on OPERATOR_NAMESPACE
 	$(OPERATOR_SDK) scorecard ./bundle -n $(OPERATOR_NAMESPACE)
 
+.PHONY: bundle-reset
+bundle-reset: ## Regenerate the checked-in bundle for the default version
+	VERSION=$(DEFAULT_VERSION) $(MAKE) manifests bundle
+	VERSION=$(DEFAULT_VERSION) $(MAKE) add-replaces-field
+	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <$(DEFAULT_VERSION)'|;" ${CSV}
+	VERSION=$(DEFAULT_VERSION) $(MAKE) bundle-validate
+
 .PHONY: verify-unchanged
-verify-unchanged: ## Verify there are no un-committed changes
+verify-unchanged: bundle-reset ## Verify there are no un-committed changes
 	./hack/verify-unchanged.sh
 
 .PHONY: container-build
