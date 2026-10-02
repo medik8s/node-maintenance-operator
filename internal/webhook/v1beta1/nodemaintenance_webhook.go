@@ -24,6 +24,7 @@ import (
 	"github.com/medik8s/common/pkg/nodes"
 
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -139,11 +140,17 @@ func (v *nodeMaintenanceValidator) validateNoNodeMaintenanceExists(nodeName stri
 
 func (v *nodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) error {
 	if !v.isOpenShift {
-		// etcd quorum PDB is only installed in OpenShift
-		nodemaintenancelog.Info("Cluster does not have etcd quorum PDB, thus we can't asses control-plane quorum violation")
-		return nil
+		hasEtcdQuorumPDB, err := v.hasEtcdQuorumPDB()
+		if err != nil {
+			return fmt.Errorf("could not check for etcd quorum PDB, please try again: %v", err)
+		}
+		if !hasEtcdQuorumPDB {
+			nodemaintenancelog.Info("Cluster does not have etcd quorum PDB, thus we can't assess control-plane quorum violation")
+			return nil
+		}
+		nodemaintenancelog.Info("Cluster has an etcd quorum PDB; enabling control-plane quorum validation")
 	}
-	// check if the node is a control-plane node on OpenShift
+	// Check whether the node is a control-plane node on a cluster guarded by an etcd PDB.
 	node, err := getNode(nodeName, v.client)
 	if err != nil {
 		return fmt.Errorf("could not get node for master/control-plane quorum validation, please try again: %v", err)
@@ -164,6 +171,23 @@ func (v *nodeMaintenanceValidator) validateControlPlaneQuorum(nodeName string) e
 		return fmt.Errorf(errorControlPlaneQuorumViolation, nodeName)
 	}
 	return nil
+}
+
+func (v *nodeMaintenanceValidator) hasEtcdQuorumPDB() (bool, error) {
+	for _, name := range []string{etcdQuorumPDBNewName, etcdQuorumPDBOldName} {
+		pdb := &policyv1.PodDisruptionBudget{}
+		err := v.client.Get(context.TODO(), types.NamespacedName{
+			Namespace: etcdQuorumPDBNamespace,
+			Name:      name,
+		}, pdb)
+		if err == nil {
+			return true, nil
+		}
+		if !apierrors.IsNotFound(err) {
+			return false, err
+		}
+	}
+	return false, nil
 }
 
 // getNode returns a node if it exists, otherwise it returns nil

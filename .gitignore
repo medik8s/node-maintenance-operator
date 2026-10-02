@@ -88,3 +88,4 @@ tags
 catalog/
 catalog.Dockerfile
 .tools/
+.kube/
