@@ -9,7 +9,7 @@
 
 NMO is a standalone operator in the [medik8s](https://medik8s.io) family. Unlike the remediation operators (SNR, MDR, FAR, SBR), NMO is **not a remediator** — it does not respond to NHC. It is a declarative cordon/drain tool: admins create a `NodeMaintenance` CR to take a node out of service for planned maintenance (upgrades, hardware work, etc.).
 
-NMO was previously developed under [KubeVirt](https://github.com/kubevirt/node-maintenance-operator); this repository is the current version. It coordinates with NHC via Leases to avoid conflicting with automated remediation.
+NMO was previously developed under [KubeVirt](https://github.com/kubevirt/node-maintenance-operator); this repository is the current version. It coordinates with NHC through a **shared per-node Lease** (`github.com/medik8s/common/pkg/lease`): NHC must obtain the node's lease before creating a remediation CR, and NMO must obtain the same lease before cordoning/draining — whoever holds it blocks the other, so NHC won't fence a node under maintenance and NMO won't drain a node being remediated. NMO also sets the `ExcludeFromRemediation` label on the node while it is under maintenance.
 
 ## What NMO does
 
