@@ -268,6 +268,9 @@ add-ocp-annotations: yq ## Add OCP annotations
 build: ## Build manager binary.
 	./hack/build.sh
 
+.PHONY: manager
+manager: build ## Compatibility alias for shared CI bundle verification.
+
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
