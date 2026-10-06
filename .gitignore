@@ -84,7 +84,7 @@ tags
 .vscode/*
 .history
 # End of https://www.gitignore.io/api/go,vim,emacs,visualstudiocode
-.DS_STORE
+.DS_Store
 
 catalog/
 catalog.Dockerfile
