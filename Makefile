@@ -9,8 +9,7 @@ ENVTEST_VERSION ?= v0.0.0-20260120065648-aebc15d7c689
 # See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
 GOIMPORTS_VERSION ?= v0.44.0
 # See https://github.com/onsi/ginkgo/releases for the last version
-# TODO get rid of this, check other operators
-GINKGO_VERSION ?= v2.28.3
+GINKGO_VERSION ?= $(shell sed -n 's/^[[:space:]]*github.com\/onsi\/ginkgo\/v2 \([^ ]*\).*/\1/p' go.mod)
 # See github.com/operator-framework/operator-registry/releases for the last version
 OPM_VERSION ?= v1.66.0
 # See github.com/operator-framework/operator-sdk/releases for the last version
@@ -55,9 +54,8 @@ endif
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
-# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
-# - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-CI_VERSION := 9.9.9-dummy
+# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=5.8.1)
+# - use environment variables to overwrite this value (e.g export VERSION=5.8.1)
 VERSION ?= $(DEFAULT_VERSION)
 PREVIOUS_VERSION ?= 5.7.1
 SKIP_RANGE_LOWER ?= 0.12.0
@@ -119,12 +117,7 @@ KUBECTL=oc
 endif
 
 # CONTAINER_TOOL defines the container tool to be used for building images.
-CONTAINER_TOOL ?= $(shell \
-	if command -v podman >/dev/null 2>&1; then echo podman; \
-	elif command -v docker >/dev/null 2>&1; then echo docker; \
-	else echo podman; \
-	fi \
-)
+CONTAINER_TOOL ?= podman
 export CONTAINER_TOOL
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
@@ -223,6 +216,8 @@ bundle-update: ## Update CSV fields and validate the bundle directory
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
 	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ${CSV}
 	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
+	$(MAKE) add-replaces-field
+	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'|;" ${CSV}
 	$(MAKE) bundle-validate
 
 .PHONY: add-replaces-field
@@ -278,8 +273,8 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 .PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
+docker-build: test-no-verify ## Build docker image without rejecting intentional candidate bundle changes.
+	$(CONTAINER_TOOL) build --build-arg OPERATOR_VERSION=$(VERSION) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -510,7 +505,7 @@ container-build: test ## Build containers
 
 .PHONY: bundle-build-community
 bundle-build-community: bundle-community-k8s ## Run bundle community changes in CSV, and then build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(CONTAINER_TOOL) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: container-build-community
 container-build-community: docker-build bundle-build-community ## Build containers for community

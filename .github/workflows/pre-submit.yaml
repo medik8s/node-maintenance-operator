@@ -38,8 +38,6 @@ jobs: # jobs to run
       KIND_VERSION: v0.22.0
       # see https://hub.docker.com/r/kindest/node/tags for available versions!
       K8S_VERSION: v1.27.11
-      NMO_VERSION: 0.18.0
-      NMO_PREVIOUS_VERSION: 0.17.0
 
     steps:
     - name: Checkout code
@@ -63,7 +61,7 @@ jobs: # jobs to run
         kubectl get nodes -o=wide
 
     - name: Build bundle-community
-      run: PREVIOUS_VERSION=${{env.NMO_PREVIOUS_VERSION}} VERSION=${{env.NMO_VERSION}} make bundle-community
+      run: make bundle-community
 
     - name: Run scorecard tests
       run: OPERATOR_NAMESPACE=default make test-scorecard
