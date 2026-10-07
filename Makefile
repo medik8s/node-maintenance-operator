@@ -214,12 +214,24 @@ export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
 export CSV ?= "./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
 
 .PHONY: bundle-update
-bundle-update: ## Update CSV fields and validate the bundle directory
+bundle-update: verify-previous-version verify-skip-range ## Update CSV fields and validate the bundle directory
+	@if [ -z "$(PREVIOUS_VERSION)" ]; then \
+		echo "Error: PREVIOUS_VERSION must be set"; \
+		exit 1; \
+	fi
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
 	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ${CSV}
 	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
 	$(MAKE) add-replaces-field
-	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'|;" ${CSV}
+	@if [ -n "$(SKIP_RANGE_LOWER)" ]; then \
+		if grep -q '^    olm\.skipRange:' ${CSV}; then \
+			sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'|;" ${CSV}; \
+		else \
+			sed -r -i "/^  annotations:/ a\    olm.skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'" ${CSV}; \
+		fi; \
+	else \
+		sed -r -i "/    olm.skipRange:.*/d" ${CSV}; \
+	fi
 	$(MAKE) bundle-validate
 
 .PHONY: verify-previous-version
@@ -237,6 +249,15 @@ add-replaces-field: verify-previous-version ## Add replaces field to the CSV
 	fi
 	sed -r -i "/  replaces:.*/d" ${CSV}
 	sed -r -i "/  version: $(VERSION)/ a\  replaces: $(OPERATOR_NAME).v$(PREVIOUS_VERSION)" ${CSV}
+
+.PHONY: verify-skip-range
+verify-skip-range: ## Require any skip-range lower bound to be older than the candidate.
+	@if [ -n "$(SKIP_RANGE_LOWER)" ]; then \
+		if [ "$(SKIP_RANGE_LOWER)" = "$(VERSION)" ] || ! printf '%s\n' "$(SKIP_RANGE_LOWER)" "$(VERSION)" | sort -V -C 2>/dev/null; then \
+			echo "Error: VERSION must be greater than SKIP_RANGE_LOWER"; \
+			exit 1; \
+		fi; \
+	fi
 
 .PHONY: bundle-reset-date
 bundle-reset-date: ## Reset bundle's createdAt
@@ -388,7 +409,13 @@ define go-install-tool
 endef
 
 .PHONY: bundle
-bundle: manifests operator-sdk kustomize ## Generate bundle manifests and metadata, then validate generated files.
+bundle: verify-previous-version verify-skip-range ## Generate bundle manifests and metadata, then validate generated files.
+	@if [ -z "$(PREVIOUS_VERSION)" ]; then \
+		echo "Error: PREVIOUS_VERSION must be set"; \
+		exit 1; \
+	fi
+	# Validate before starting generation, including under parallel Make.
+	$(MAKE) manifests operator-sdk kustomize
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
@@ -442,7 +469,7 @@ CATALOG_INDEX := $(CATALOG_DIR)/index.yaml
 # Add olm.channel entries for each channel in CHANNELS.
 # Keep the default candidate's upgrade edge in the catalog.
 .PHONY: add_channel_entry_for_the_bundle
-add_channel_entry_for_the_bundle: verify-previous-version
+add_channel_entry_for_the_bundle: verify-previous-version verify-skip-range
 	@for channel in $(shell echo ${CHANNELS} | tr ',' ' '); do \
 		echo "---" >> ${CATALOG_INDEX}; \
 		echo "schema: olm.channel" >> ${CATALOG_INDEX}; \
@@ -454,11 +481,7 @@ add_channel_entry_for_the_bundle: verify-previous-version
 		if [ -n "${PREVIOUS_VERSION}" ]; then \
 			echo "    replaces: ${OPERATOR_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
 		fi; \
-		if [ -n "${SKIP_RANGE_LOWER}" ] && [ "${VERSION}" != "${SKIP_RANGE_LOWER}" ]; then \
-			if ! printf '%s\n' "${SKIP_RANGE_LOWER}" "${VERSION}" | sort -V -C 2>/dev/null; then \
-				echo "Error: VERSION (${VERSION}) must be greater than SKIP_RANGE_LOWER (${SKIP_RANGE_LOWER})"; \
-				exit 1; \
-			fi; \
+		if [ -n "${SKIP_RANGE_LOWER}" ]; then \
 			echo "    skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'" >> ${CATALOG_INDEX}; \
 		fi; \
 	done
@@ -471,7 +494,8 @@ build-tools: ## Download & build all the tools locally if necessary.
 # This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
 # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
 .PHONY: catalog-build
-catalog-build: opm ## Build a file-based catalog image.
+catalog-build: verify-previous-version verify-skip-range ## Build a file-based catalog image.
+	$(MAKE) opm
 	# Remove the catalog directory and Dockerfile if they exist
 	-rm -rf ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
 	@mkdir -p ${CATALOG_DIR}
@@ -501,7 +525,7 @@ test-scorecard: operator-sdk ## Run Scorecard testing for the bundle directory o
 
 .PHONY: bundle-reset
 bundle-reset: ## Regenerate the checked-in bundle for the default version
-	$(MAKE) manifests bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
+	$(MAKE) bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
 	$(MAKE) add-replaces-field VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
 	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=$(DEFAULT_SKIP_RANGE_LOWER) <$(DEFAULT_VERSION)'|;" ${CSV}
 	$(MAKE) bundle-validate VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
