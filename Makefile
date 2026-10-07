@@ -220,10 +220,17 @@ bundle-update: ## Update CSV fields and validate the bundle directory
 	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'|;" ${CSV}
 	$(MAKE) bundle-validate
 
+.PHONY: verify-previous-version
+verify-previous-version: ## Require any previous version to be older than the candidate.
+	@if [ -n "$(PREVIOUS_VERSION)" ] && [ "$$(./hack/semver_cmp.sh "$(VERSION)" "$(PREVIOUS_VERSION)")" != 1 ]; then \
+		echo "Error: VERSION must be greater than PREVIOUS_VERSION"; \
+		exit 1; \
+	fi
+
 .PHONY: add-replaces-field
-add-replaces-field: ## Add replaces field to the CSV
-	@if [ -z "$(PREVIOUS_VERSION)" ] || [ "$(PREVIOUS_VERSION)" = "$(VERSION)" ]; then \
-		echo "Error: PREVIOUS_VERSION must be set and differ from VERSION"; \
+add-replaces-field: verify-previous-version ## Add replaces field to the CSV
+	@if [ -z "$(PREVIOUS_VERSION)" ]; then \
+		echo "Error: PREVIOUS_VERSION must be set"; \
 		exit 1; \
 	fi
 	sed -r -i "/  replaces:.*/d" ${CSV}
@@ -433,7 +440,7 @@ CATALOG_INDEX := $(CATALOG_DIR)/index.yaml
 # Add olm.channel entries for each channel in CHANNELS.
 # Keep the default candidate's upgrade edge in the catalog.
 .PHONY: add_channel_entry_for_the_bundle
-add_channel_entry_for_the_bundle:
+add_channel_entry_for_the_bundle: verify-previous-version
 	@for channel in $(shell echo ${CHANNELS} | tr ',' ' '); do \
 		echo "---" >> ${CATALOG_INDEX}; \
 		echo "schema: olm.channel" >> ${CATALOG_INDEX}; \
@@ -492,10 +499,10 @@ test-scorecard: operator-sdk ## Run Scorecard testing for the bundle directory o
 
 .PHONY: bundle-reset
 bundle-reset: ## Regenerate the checked-in bundle for the default version
-	VERSION=$(DEFAULT_VERSION) $(MAKE) manifests bundle
-	VERSION=$(DEFAULT_VERSION) $(MAKE) add-replaces-field
+	$(MAKE) manifests bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION)
+	$(MAKE) add-replaces-field VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION)
 	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <$(DEFAULT_VERSION)'|;" ${CSV}
-	VERSION=$(DEFAULT_VERSION) $(MAKE) bundle-validate
+	$(MAKE) bundle-validate VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION)
 
 .PHONY: verify-unchanged
 verify-unchanged: bundle-reset ## Verify there are no un-committed changes
