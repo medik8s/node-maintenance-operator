@@ -34,6 +34,7 @@ jobs:
     name: Build and push versioned images to quay.io/medik8s
     runs-on: ubuntu-24.04
     env:
+      CONTAINER_TOOL: docker
       VERSION: ${{ inputs.version }}
       PREVIOUS_VERSION: ${{ inputs.previous_version }}
       OCP_VERSION: ${{ inputs.ocp_version }}

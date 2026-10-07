@@ -12,6 +12,8 @@ jobs:
   push_to_registry:
     name: Build and push unversioned images to quay.io/medik8s
     runs-on: ubuntu-24.04
+    env:
+      CONTAINER_TOOL: docker
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -30,5 +32,5 @@ jobs:
           password: ${{ secrets.QUAY_PASSWORD }}
           registry: quay.io
 
-      - name: Build and push CSV version 0.0.1 with latest images
-        run: export IMAGE_REGISTRY=quay.io/medik8s && make container-build-and-push-community
+      - name: Build and push current main images
+        run: export IMAGE_REGISTRY=quay.io/medik8s && make container-build-and-push-community IMAGE_TAG=latest
