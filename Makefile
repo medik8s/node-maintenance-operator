@@ -32,6 +32,8 @@ export IMAGE_REGISTRY
 
 # Use the selected version for image tags.
 DEFAULT_VERSION := 5.8.0
+DEFAULT_PREVIOUS_VERSION := 5.7.1
+DEFAULT_SKIP_RANGE_LOWER := 0.12.0
 IMAGE_TAG = v$(VERSION)
 export IMAGE_TAG
 
@@ -57,8 +59,8 @@ endif
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=5.8.1)
 # - use environment variables to overwrite this value (e.g export VERSION=5.8.1)
 VERSION ?= $(DEFAULT_VERSION)
-PREVIOUS_VERSION ?= 5.7.1
-SKIP_RANGE_LOWER ?= 0.12.0
+PREVIOUS_VERSION ?= $(DEFAULT_PREVIOUS_VERSION)
+SKIP_RANGE_LOWER ?= $(DEFAULT_SKIP_RANGE_LOWER)
 export VERSION
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -499,10 +501,10 @@ test-scorecard: operator-sdk ## Run Scorecard testing for the bundle directory o
 
 .PHONY: bundle-reset
 bundle-reset: ## Regenerate the checked-in bundle for the default version
-	$(MAKE) manifests bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION)
-	$(MAKE) add-replaces-field VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION)
-	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <$(DEFAULT_VERSION)'|;" ${CSV}
-	$(MAKE) bundle-validate VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION)
+	$(MAKE) manifests bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
+	$(MAKE) add-replaces-field VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
+	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=$(DEFAULT_SKIP_RANGE_LOWER) <$(DEFAULT_VERSION)'|;" ${CSV}
+	$(MAKE) bundle-validate VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
 
 .PHONY: verify-unchanged
 verify-unchanged: bundle-reset ## Verify there are no un-committed changes
