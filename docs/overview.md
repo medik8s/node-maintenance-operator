@@ -13,7 +13,7 @@ NMO is **not** a generic “cluster upgrade” tool; it reconciles one **cluster
    - Requests a **coordination lease** held as identity **`node-maintenance`** (duration **1 hour** in code).
    - Patches the **exclude-from-remediation** label on the node.
    - Applies maintenance **taints** (**`node.kubernetes.io/unschedulable`** and **`medik8s.io/drain`**, **NoSchedule**) and **cordons** the node.
-   - Runs **node drain** with **force**, **delete emptyDir data**, **ignore DaemonSets**, and a **30s** per-drain timeout (see **architecture** for details).
+   - Runs **node drain** with **force**, **delete emptyDir data**, **ignore DaemonSets**, and a **30s** per-drain timeout (see **`../ARCHITECTURE.md`** for details).
 3. When drain completes, **phase** becomes **Succeeded** and an event records success.
 4. When you **delete** the CR, the finalizer **uncordons**, removes taints and the exclude label, **invalidates** the lease (or skips if the lease is held by someone else), and removes the finalizer.
 
@@ -34,4 +34,4 @@ NMO is **not** a generic “cluster upgrade” tool; it reconciles one **cluster
 
 ## What this file is not
 
-This overview does **not** spell out every **status** field, webhook error string, or lease counter threshold. See **architecture**, **failure_modes**, and **runbook**.
+This overview does **not** spell out every **status** field, webhook error string, or lease counter threshold. See **`../ARCHITECTURE.md`**, **`failure_modes.md`**, and **`runbook.md`**.

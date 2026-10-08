@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Commands and fields for **NodeMaintenance** day-2 ops. Behaviour details: **`architecture.md`**, **`failure_modes.md`**.
+Commands and fields for **NodeMaintenance** day-2 ops. Behaviour details: **`../ARCHITECTURE.md`**, **`failure_modes.md`**.
 
 ## Components
 

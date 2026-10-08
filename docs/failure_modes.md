@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Symptom-first notes for NMO. Pair with **`architecture.md`** and **`runbook.md`**.
+Symptom-first notes for NMO. Pair with **`../ARCHITECTURE.md`** and **`runbook.md`**.
 
 ## Governing constants (selected)
 
@@ -106,5 +106,5 @@ Symptom-first notes for NMO. Pair with **`architecture.md`** and **`runbook.md`*
 
 ## Related pieces
 
-- **`architecture.md`** — ordering and constants.
+- **`../ARCHITECTURE.md`** — ordering and constants.
 - **`runbook.md`** — commands.

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Runtime behaviour of **Node Maintenance Operator**: **`NodeMaintenance`** reconciliation, **webhook** rules, **taints**, **drain**, and **lease** integration. Read **`overview.md`** first.
+Runtime behaviour of **Node Maintenance Operator**: **`NodeMaintenance`** reconciliation, **webhook** rules, **taints**, **drain**, and **lease** integration. Read **`docs/overview.md`** first.
 
 **Code reference:** `github.com/medik8s/node-maintenance-operator`.
 
@@ -23,7 +23,7 @@ Runtime behaviour of **Node Maintenance Operator**: **`NodeMaintenance`** reconc
   - On **OpenShift** (`isOpenShift` from **`utils.NewOpenshiftValidator`** in **`cmd/main.go`**), if the node is **control-plane**, **`etcd.IsEtcdDisruptionAllowed`** must allow disruption (uses **etcd** guard PDB logic in **`openshift-etcd`** namespace — **etcd-guard-pdb** / **etcd-quorum-guard** naming in webhook constants).
 - **Non-OpenShift:** control-plane **quorum** webhook check is **skipped** (log notes no etcd PDB).
 - **Update:** changing **`spec.nodeName`** is **forbidden**.
-- **Delete:** validator runs but returns **no error** (logging only).
+- **Delete:** the Go type implements **`ValidateDelete`** (logs only, returns no error) to satisfy the **`webhook.CustomValidator`** interface, but the **`+kubebuilder:webhook`** marker only registers **`verbs=create;update`**—confirmed in the generated **`config/webhook/manifests.yaml`**, whose **`operations`** list is **`CREATE`**/**`UPDATE`** only. **Delete requests are never sent to the webhook**; this validator exists in code but is not wired up.
 
 ## Operator startup (`cmd/main.go`)
 
@@ -89,7 +89,7 @@ See **`nodemaintenance_controller.go`** kubebuilder comments: **NodeMaintenance*
 
 ## Related pieces
 
-- **`failure_modes.md`**, **`runbook.md`**, **`code_map.md`**
+- **`docs/failure_modes.md`**, **`docs/runbook.md`**, **`docs/code_map.md`**
 
 ## Scope
 

@@ -51,7 +51,7 @@ node-maintenance-operator/
 
 ## Related pieces
 
-- **`architecture.md`**
+- **`../ARCHITECTURE.md`**
 - **`runbook.md`**
 
 ## Scope
