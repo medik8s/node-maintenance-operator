@@ -220,6 +220,7 @@ bundle-update: verify-previous-version verify-skip-range ## Update CSV fields an
 		exit 1; \
 	fi
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
+	sed -r -i "s|^([[:space:]]+image:).*|\1 $(IMG)|;" ${CSV}
 	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ${CSV}
 	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
 	$(MAKE) add-replaces-field
@@ -555,6 +556,9 @@ container-build-and-push-community: container-build-community container-push ## 
 .PHONY: cluster-functest
 cluster-functest: ginkgo ## Run e2e tests in a real cluster
 	./hack/functest.sh $(GINKGO_VERSION)
+
+.PHONY: test-e2e
+test-e2e: cluster-functest ## Standardized e2e test target alias
 
 # Shared dev environment
 # Uses a local sibling checkout if available (e.g. ../tools),
