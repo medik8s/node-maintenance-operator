@@ -1,0 +1,136 @@
+name: Kind E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: ['**']
+  workflow_dispatch:
+    inputs:
+      tools-repository:
+        description: 'Tools fork (e.g. my-user/tools). Leave blank for default.'
+        required: false
+        default: ''
+      tools-ref:
+        description: 'Tools branch. Leave blank for default.'
+        required: false
+        default: ''
+
+# A single run per pull request or branch, superseding any stale one.
+concurrency:
+  group: kind-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kind-e2e:
+    name: Kind E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      TOOLS_DIR: ${{ github.workspace }}/.tools
+      MEDIK8S_CLUSTER_NAME: medik8s-ci
+      CONTAINER_TOOL: docker
+      KIND_HA: "true"
+      KUBECONFIG: ${{ github.workspace }}/.kube/config
+
+      # Registry (created by dev-setup)
+      MEDIK8S_REGISTRY_NAME: kind-registry
+      MEDIK8S_REGISTRY_PORT: "5000"
+      IMAGE_REGISTRY: kind-registry:5000/medik8s
+
+      # Deployment
+      # VERSION / PREVIOUS_VERSION are intentionally not pinned here, so that
+      # the bundle is always built for the Makefile's current default version.
+      OPERATOR_NAMESPACE: node-maintenance-operator
+      TEST_NAMESPACE: nmo-test
+
+    steps:
+      - name: Checkout NMO
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Checkout Tools
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.tools-repository || 'medik8s/tools' }}
+          ref: ${{ inputs.tools-ref || 'main' }}
+          path: .tools
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install operator-sdk
+        run: |
+          make operator-sdk
+          if [ -f ./bin/operator-sdk ]; then
+            sudo cp ./bin/operator-sdk /usr/local/bin/
+          else
+            OPERATOR_SDK_BIN=$(find ./bin -name operator-sdk -type f | head -1)
+            [ -n "${OPERATOR_SDK_BIN}" ] && sudo cp "${OPERATOR_SDK_BIN}" /usr/local/bin/
+          fi
+
+      - name: Create HA Kind cluster with registry, OLM, cert-manager & etcd-guard
+        run: make dev-setup
+
+      - name: Prepare operator namespace
+        run: |
+          kubectl create ns ${OPERATOR_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+          kubectl label --overwrite ns ${OPERATOR_NAMESPACE} \
+            pod-security.kubernetes.io/enforce=privileged \
+            pod-security.kubernetes.io/audit=privileged \
+            pod-security.kubernetes.io/warn=privileged
+
+      - name: Build and push NMO images and bundle
+        run: |
+          NMO_IMG=${IMAGE_REGISTRY}/node-maintenance-operator:latest
+          NMO_BUNDLE=${IMAGE_REGISTRY}/node-maintenance-operator-bundle:latest
+
+          # 1. Update CSV with community metadata and local image references
+          make bundle-community IMG=${NMO_IMG}
+
+          # 2. Build images directly to avoid triggering 'make test' -> 'verify-unchanged'
+          docker build -t ${NMO_IMG} .
+          docker build -f bundle.Dockerfile -t ${NMO_BUNDLE} .
+
+          # 3. Push images to Kind registry
+          docker push ${NMO_IMG}
+          docker push ${NMO_BUNDLE}
+
+      - name: Deploy NMO via OLM bundle
+        run: |
+          operator-sdk run bundle -n ${OPERATOR_NAMESPACE} --use-http \
+            --timeout 5m \
+            ${IMAGE_REGISTRY}/node-maintenance-operator-bundle:latest
+
+      - name: Wait for operator to be ready
+        run: make dev-wait
+
+      - name: Run e2e tests
+        timeout-minutes: 60
+        env:
+          OPERATOR_NS: ${{ env.OPERATOR_NAMESPACE }}
+          LABEL_FILTER: "!OCP-ONLY"
+        run: make test-e2e
+
+      - name: Debug on failure
+        if: ${{ failure() }}
+        run: make dev-ci-debug
+
+      - name: Upload test artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: .tests/
+          include-hidden-files: true
+          if-no-files-found: ignore
+
+      - name: Teardown Kind cluster
+        if: ${{ always() }}
+        run: make dev-teardown
