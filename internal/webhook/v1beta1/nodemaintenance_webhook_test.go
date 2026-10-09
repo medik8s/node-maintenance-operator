@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -9,7 +10,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nodemaintenancev1beta1 "github.com/medik8s/node-maintenance-operator/v5/api/v1beta1"
@@ -124,6 +127,12 @@ var _ = Describe("NodeMaintenance Validation", func() {
 						Expect(err).To(HaveOccurred())
 						Expect(err.Error()).To(ContainSubstring(errorControlPlaneQuorumViolation, node.Name))
 					})
+					It("should also be rejected on Kubernetes when the guard PDB exists", func() {
+						validator := &nodeMaintenanceValidator{client: k8sClient, isOpenShift: false}
+						err := validator.validateControlPlaneQuorum(existingNodeName)
+						Expect(err).To(HaveOccurred())
+						Expect(err.Error()).To(ContainSubstring(errorControlPlaneQuorumViolation, node.Name))
+					})
 				})
 				When("node doesn't have etcd guard pod", func() {
 					It("should be allowed", func() {
@@ -161,7 +170,75 @@ var _ = Describe("NodeMaintenance Validation", func() {
 					Expect(err.Error()).To(ContainSubstring(errorControlPlaneQuorumViolation, node.Name))
 				})
 
+				It("should be allowed on Kubernetes", func() {
+					validator := &nodeMaintenanceValidator{client: k8sClient, isOpenShift: false}
+					Expect(validator.validateControlPlaneQuorum(existingNodeName)).To(Succeed())
+				})
+
 			})
+
+			Context("with the pre 4.11 etcd quorum guard PDB", func() {
+
+				BeforeEach(func() {
+					pdb := getTestPDB()
+					pdb.Name = etcdQuorumPDBOldName
+					Expect(k8sClient.Create(context.Background(), pdb)).To(Succeed())
+					DeferCleanup(k8sClient.Delete, context.Background(), pdb)
+
+					guardPod := getPodGuard(existingNodeName)
+					Expect(k8sClient.Create(context.Background(), guardPod)).To(Succeed())
+					setPodConditionReady(context.Background(), guardPod, corev1.ConditionTrue)
+					var force client.GracePeriodSeconds = 0
+					DeferCleanup(k8sClient.Delete, context.Background(), guardPod, force)
+				})
+
+				It("should be rejected on Kubernetes as well", func() {
+					validator := &nodeMaintenanceValidator{client: k8sClient, isOpenShift: false}
+					err := validator.validateControlPlaneQuorum(existingNodeName)
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring(errorControlPlaneQuorumViolation, node.Name))
+				})
+
+			})
+		})
+
+		Context("for worker node on Kubernetes with an etcd quorum guard PDB", func() {
+
+			BeforeEach(func() {
+				node := getTestNode(existingNodeName, false)
+				Expect(k8sClient.Create(context.Background(), node)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, context.Background(), node)
+
+				pdb := getTestPDB()
+				Expect(k8sClient.Create(context.Background(), pdb)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, context.Background(), pdb)
+			})
+
+			It("should be allowed, the quorum check applies to control-plane nodes only", func() {
+				validator := &nodeMaintenanceValidator{client: k8sClient, isOpenShift: false}
+				Expect(validator.validateControlPlaneQuorum(existingNodeName)).To(Succeed())
+			})
+
+		})
+
+		Context("when the etcd quorum guard PDB lookup fails on Kubernetes", func() {
+
+			It("should be rejected, the quorum check fails closed", func() {
+				failingClient := pdbErrorClient{
+					Client: k8sClient,
+					err: apierrors.NewForbidden(
+						schema.GroupResource{Group: "policy", Resource: "poddisruptionbudgets"},
+						etcdQuorumPDBNewName,
+						errors.New("not allowed to read PDBs"),
+					),
+				}
+
+				validator := &nodeMaintenanceValidator{client: failingClient, isOpenShift: false}
+				err := validator.validateControlPlaneQuorum(existingNodeName)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("could not check for etcd quorum PDB"))
+			})
+
 		})
 
 	})
@@ -194,6 +271,20 @@ var _ = Describe("NodeMaintenance Validation", func() {
 		})
 	})
 })
+
+// pdbErrorClient fails every PodDisruptionBudget read with err, and delegates
+// everything else, for covering the fail-closed path of the quorum validation.
+type pdbErrorClient struct {
+	client.Client
+	err error
+}
+
+func (c pdbErrorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if _, isPDB := obj.(*policyv1.PodDisruptionBudget); isPDB {
+		return c.err
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
+}
 
 func getTestNMO(nodeName string) *nodemaintenancev1beta1.NodeMaintenance {
 	return &nodemaintenancev1beta1.NodeMaintenance{
