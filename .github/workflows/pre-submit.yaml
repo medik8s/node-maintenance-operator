@@ -1,14 +1,20 @@
 # Understanding the workflow file - https://docs.github.com/en/actions/learn-github-actions/understanding-github-actions#understanding-the-workflow-file
 name: Pre Submit # workflow name
 on: # on events
+  # main* also covers fork branches (main-<topic>), so a push to a fork runs
+  # the suite without opening a PR first.
   push:
-    branches:
-      - main
-      - release-*
+    branches: [main*, medik8s-*, release-*]
+  # Any target branch: main, medik8s-X.Y, release-X.Y, and cherry-pick PRs.
   pull_request:
-    branches:
-      - main
-      - release-*
+    branches: ['**']
+  workflow_dispatch: {}
+
+# A single run per pull request or branch, superseding any stale one.
+concurrency:
+  group: pre-submit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs: # jobs to run
   build:
     name: Test and build PRs
