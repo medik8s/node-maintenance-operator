@@ -45,10 +45,10 @@ type NodeMaintenanceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Node name to apply maintanance on/off
+	// Node name to apply maintenance on/off
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	NodeName string `json:"nodeName"`
-	// Reason for maintanance
+	// Reason for maintenance
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	Reason string `json:"reason,omitempty"`
 }
