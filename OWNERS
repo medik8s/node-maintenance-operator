@@ -11,6 +11,7 @@ filters:
       - jmontleon
       - abrugaro
       - eemcmullan
+      - RanWurmbrand
     approvers:
       - beekhof
       - slintes
@@ -22,6 +23,7 @@ filters:
       - jmontleon
       - abrugaro
       - eemcmullan
+      - RanWurmbrand
 
     # Specify only if your Bugzilla product is not OCP
     product: "Kubernetes-native Infrastructure"
