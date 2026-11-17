@@ -379,7 +379,7 @@ spec:
     name: Medik8s
     url: https://github.com/medik8s
   version: 5.8.0
-  replaces: node-maintenance-operator.v5.7.1
+  replaces: medik8s-node-maintenance-operator.v5.7.1
   webhookdefinitions:
   - admissionReviewVersions:
     - v1
