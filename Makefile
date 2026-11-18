@@ -61,6 +61,9 @@ endif
 VERSION ?= $(DEFAULT_VERSION)
 PREVIOUS_VERSION ?= $(DEFAULT_PREVIOUS_VERSION)
 SKIP_RANGE_LOWER ?= $(DEFAULT_SKIP_RANGE_LOWER)
+# NO_REPLACES omits the CSV / catalog "replaces" field for a clean-root release that has no
+# in-package predecessor
+NO_REPLACES ?= false
 export VERSION
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -247,12 +250,16 @@ verify-previous-version: ## Require any previous version to be older than the ca
 
 .PHONY: add-replaces-field
 add-replaces-field: verify-previous-version ## Add replaces field to the CSV
-	@if [ -z "$(PREVIOUS_VERSION)" ]; then \
-		echo "Error: PREVIOUS_VERSION must be set"; \
-		exit 1; \
-	fi
 	sed -r -i "/  replaces:.*/d" ${CSV}
-	sed -r -i "/  version: $(VERSION)/ a\  replaces: $(PACKAGE_NAME).v$(PREVIOUS_VERSION)" ${CSV}
+	# NO_REPLACES=true => clean-root release (e.g. first release after the package rename)
+	@if [ "$(NO_REPLACES)" = "true" ]; then \
+		echo "NO_REPLACES=true: omitting replaces field (clean-root release)"; \
+	elif [ -z "$(PREVIOUS_VERSION)" ]; then \
+		echo "Error: PREVIOUS_VERSION must be set for versioned builds (or set NO_REPLACES=true for a clean-root release)"; \
+		exit 1; \
+	else \
+		sed -r -i "/  version: $(VERSION)/ a\  replaces: $(PACKAGE_NAME).v$(PREVIOUS_VERSION)" ${CSV}; \
+	fi
 
 .PHONY: verify-skip-range
 verify-skip-range: ## Require any skip-range lower bound to be older than the candidate.
@@ -482,7 +489,7 @@ add_channel_entry_for_the_bundle: verify-previous-version verify-skip-range
 		echo "entries:" >> ${CATALOG_INDEX}; \
 		echo "  - name: ${PACKAGE_NAME}.v${VERSION}" >> ${CATALOG_INDEX}; \
 		\
-		if [ -n "${PREVIOUS_VERSION}" ]; then \
+		if [ "${NO_REPLACES}" != "true" ] && [ -n "${PREVIOUS_VERSION}" ]; then \
 			echo "    replaces: ${PACKAGE_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
 		fi; \
 		if [ -n "${SKIP_RANGE_LOWER}" ]; then \
@@ -530,7 +537,7 @@ test-scorecard: operator-sdk ## Run Scorecard testing for the bundle directory o
 .PHONY: bundle-reset
 bundle-reset: ## Regenerate the checked-in bundle for the default version
 	$(MAKE) bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
-	$(MAKE) add-replaces-field VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
+	NO_REPLACES=true $(MAKE) add-replaces-field VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
 	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=$(DEFAULT_SKIP_RANGE_LOWER) <$(DEFAULT_VERSION)'|;" ${CSV}
 	$(MAKE) bundle-validate VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
 
