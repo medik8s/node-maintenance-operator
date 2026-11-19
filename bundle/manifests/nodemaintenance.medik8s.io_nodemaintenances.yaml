@@ -44,10 +44,10 @@ spec:
             description: NodeMaintenanceSpec defines the desired state of NodeMaintenance
             properties:
               nodeName:
-                description: Node name to apply maintanance on/off
+                description: Node name to apply maintenance on/off
                 type: string
               reason:
-                description: Reason for maintanance
+                description: Reason for maintenance
                 type: string
             required:
             - nodeName
