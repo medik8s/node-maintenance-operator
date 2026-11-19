@@ -5,7 +5,7 @@ metadata:
     alm-examples: '[]'
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: quay.io/medik8s/node-maintenance-operator:v5.8.0
+    containerImage: quay.io/medik8s/node-maintenance-operator:v99.9.9
     createdAt: ""
     description: Node Maintenance Operator for cordoning and draining nodes.
     olm.skipRange: '>=0.12.0 <5.8.0'
