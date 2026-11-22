@@ -71,3 +71,4 @@ to uncordon.
 
 - Operator requires cluster-scoped RBAC to cordon nodes and evict pods.
 - No privileged pods; runs with standard controller-manager permissions.
+
