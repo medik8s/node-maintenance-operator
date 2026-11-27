@@ -227,7 +227,7 @@ func (r *NodeMaintenanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return r.onReconcileError(ctx, nm, drainer, err)
 	}
 	r.logger.Info("lease obtained successfully")
-	if nm.Status.Phase != v1beta1.MaintenanceRunning || nm.Status.ErrorOnLeaseCount != 0 {
+	if nm.Status.Phase != v1beta1.MaintenanceRunning && nm.Status.Phase != v1beta1.MaintenanceSucceeded || nm.Status.ErrorOnLeaseCount != 0 {
 		nm.Status.Phase = v1beta1.MaintenanceRunning
 		// Another chance to evict pods - clear ErrorOnLeaseCount and try again to put the node under maintenance
 		nm.Status.ErrorOnLeaseCount = 0
